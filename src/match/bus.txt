@@ -1,0 +1,153 @@
+🛑🛑🛑 NUMÉROS DES BUS ET DESTINATIONS, ÇA PEUT VOUS AIDER....🛑🛑
+￼ bus 02 : Cité Fairmont → Gare Marcory
+￼ bus 02 : Gare Marcory → Cité Fairmont
+￼ bus 03 : Gare Nord → Koumassi Cité Langouste
+￼ bus 03 : Koumassi Cité Langouste → Gare Nord
+￼ bus 04 : Terminus Attecoube → Gare Marcory
+￼ bus 04: Gare Marcory → Terminus Attecoube
+￼ bus 05 : Koumassi Nord-Est → Cité Administrative
+￼ bus 05: Cité Administrative → Koumassi Nord-Est
+￼ Bus 06: Aéroport → Gare Sud
+￼ Bus 06: Gare Sud → Aéroport
+￼ bus 07 : Gare Marcory → Vridi Cité
+￼ bus 07 : Vridi Cité → Gare Marcory
+￼ bus 08 : Abobo Akeikoi → Gare Nord
+￼ bus 08 : Gare Nord → Abobo Akeikoi
+￼ bus 10 : Gare Nord → Gare Sud
+￼ bus 10 : Gare Sud → Gare Nord
+￼ bus 11 : Adjamé Liberté → Koumassi Mesano
+￼ bus 11 : Gare Nord → Koumassi Mesano
+￼ bus 11 : Koumassi Mesano → Adjamé Liberté
+￼ bus 11 : Koumassi Mesano → Gare Nord
+￼ bus 12 : Gare Nord → Terminus Port-Bouët Phare
+￼ bus 12 : Terminus Port-Bouët Phare → Gare Nord
+￼ bus 13 : Adjamé Liberté → Hôpital de koumassi
+￼ bus 13 : Gare Koumassi → Adjamé Liberté
+￼ bus 13 : Gare Koumassi → Gare Nord
+￼ bus 13 : Gare Nord → Gare Koumassi
+￼ bus 13 : Hôpital de koumassi → Adjamé Liberté
+￼ bus 13: Adjamé Liberté → Gare Koumassi
+￼ bus 14 : Terminus Williamsville → Gare Marcory
+￼ bus 14: Gare Marcory - Terminus Williamsville
+￼ Bus 15 : Gare Abobo → Gare Sud
+￼ Bus 15 : Gare Sud → Gare Abobo
+￼ bus 16 : Djibi Village → Gare Nord
+￼ bus 16 : Gare Nord → Djibi Village
+￼ bus 18 : Gare Sud → Centre Pilote Port-Bouët
+￼ bus 18: Centre Pilote Port-Bouët → Gare Sud
+￼ bus 19 : Gare Nord → Vridi Iran
+￼ bus 19 : Vridi Iran → Gare Nord
+￼ bus 20 : Cité ADO Zone Industrielle → Gare Sud
+￼ bus 20 : Gare Sud → Cité ADO Zone Industrielle
+￼ bus 20 : Gare Sud → Micao Zone Industrielle
+￼ bus 20 : Micao Zone Industrielle → Gare Sud
+￼ bus 21 : École Nationale de Police → CHU Treichville
+￼ bus 21 : CHU Treichville → École Nationale de Police
+￼ bus 22 : Cinéma Entente Treichville → Gare Nord
+￼ bus 22 : Gare Nord → Cinéma Entente Treichville
+￼ bus 23 : Gare Koumassi → Vridi Canal
+￼ bus 23: Vridi Canal → Gare Koumassi
+￼ bus 24 : CPMA Vridi → Koumassi Nord-Est
+￼ bus 24 : Koumassi Nord-Est → CPMA Vridi
+￼ bus 25: Hôtel de ville Plateau → Koumassi Sicogi
+￼ bus 25: Koumassi Sicogi → Hôtel de Ville Plateau
+￼ bus 26 : Gare Koumassi → Gare Nord
+￼ bus 26 : Gare Nord → Gare Koumassi
+￼ bus 27 : Gare Sud → Yopougon Niangon Sud à gauche
+￼ bus 27 : Yopougon Niangon Sud à gauche → Gare Sud
+￼ bus 28 : Gare Sud → Riviéra M'pouto
+￼ bus 28 : Gare Sud → Terminus Riviéra 2
+￼ bus 28 : Riviéra M'pouto → Gare Sud
+￼ bus 28 : Terminus Riviéra 2 → Gare Sud
+￼ bus 29 : Gare Nord → Port-Bouet derrière warf
+￼ bus 29 :Port-Bouet derrière warf → Gare Nord
+￼ bus 30 : Gare Sud → Yopougon Kouté
+￼ bus 30 : Yopougon Kouté → Gare Sud
+￼ bus 31 : Commissariat du Port → Koumassi Alliodan
+￼ bus 31 : Koumassi Alliodan → Commissariat du Port
+￼ bus 32 : Commissariat du Port → Koumassi Akromiabla
+￼ bus 32 : Koumassi Akromiabla → Commissariat du Port
+￼ bus 33 : Gare Sud → Koumassi Akromiabla
+￼ bus 33 : Koumassi Akromiabla → Gare Sud
+￼ bus 35 : II plateaux vallon → Gare Nord
+￼ bus 35 : Gare Nord → II plateaux vallon
+￼ bus 37 : Yopougon Camp Militaire → Gare Sud
+￼ bus 37: Gare Sud→Yopougon Camp Militaire
+￼ bus 39 : Gare Sud → Niangon Sud à droite
+￼ bus 39 : Niangon Sud à droite → Gare Sud
+￼ bus 40 : Gare Sud → Yopougon Kouté
+￼ bus 40 : Yopougon Kouté → Gare Sud
+[  ] bus 41 :  Adjamé Liberté >> Riviéra M'badon
+[  ] bus 41 : Riviéra M'badon >> Adjamé Liberté
+[  ] bus 42 : Terminus 42 >>> Gare abobodoumé
+[  ] bus 42 : Gare abobondoumé >>Terminus 42
+￼ bus 43 : Gare Nord → Yopougon Kouté
+￼ bus 44 : Abobo Doumé → Yopougon Cité Verte
+￼ bus 44 : Yopougon Cité Verte → Abobo Doumé
+￼ Bus 45 : Abobo PK18 → Gare Nord
+￼ Bus 45 : Gare Nord → Abobo PK18
+￼ bus 46 : Cité Administrative → Yopougon Sideci
+￼ bus 48 : Abobo Gendarmerie → Saint Jean
+￼ bus 48 : Saint Jean → Abobo Gendarmerie
+￼ bus 49 : Gare Abobo → Gare Campus
+￼ bus 50 : Gare Nord → Koumassi Terminus Sicogi
+￼ bus 50 : Koumassi Terminus Sicogi → Gare Nord
+￼ bus 51 : Cité Administrative → Terminus Sagbé
+￼ bus 51 : Terminus Sagbé → Cité Administrative
+￼ bus 52 : Abobo Sagbé → Campus Cocody
+￼ bus 52 : Campus Cocody → Abobo Sagbé
+￼ bus 53 : Cité Vridi → Gare Campus
+￼ bus 53 : Gare Campus → Gonzagueville
+￼ bus 53 : Gare Campus → Vridi Cité
+￼ bus 53 : Gonzagueville → Gare Campus
+￼ bus 54 : Abobo Gendarmerie → Cité Administrative
+￼ bus 54 : Cité Administrative → Abobo Gendarmerie
+￼ bus 56 : CHU de Cocody → Koumassi Nord-Est
+￼ bus 56 : Koumassi Nord-Est → CHU de Cocody
+￼ bus 58 : Adjamé Liberté → Vridi Port de Pêche
+￼ bus 58 : Vridi Port de Pêche → Adjamé Liberté
+￼ bus 59 : CHU Treichville → Gare Nord
+￼ bus 59 : Gare Nord → CHU Treichville
+￼ bus 60 : Abobo Gendarmerie → Mairie Anyama
+￼ bus 61 : Abobo Pharmacie la Me → Ebimpe
+￼ bus 64 : Cocody Blockausso → Gare Nord
+￼ bus 64 : Gare Nord → Cocody Blockausso
+￼ bus 67 : Anani → Gare Lagunaire Treichville
+￼ bus 67 : Gare Lagunaire Treichville → Anani
+￼ bus 67 : Gare Lagunaire Treichville → Gonzagueville
+￼ bus 67 : Gonzagueville → Gare Lagunaire Treichville
+￼ bus 68 : Gare Koumassi → Anani
+￼ bus 75 : Abobo Baoulé → Cité Administrative
+￼ bus 75 : Cité Administrative→ Abobo Baoulé
+￼ bus 76 : Abobo PK18 → Cité Administrative
+￼ bus 76 : Cité Administrative → Abobo PK18
+￼ bus 77 : Abobo Gendarmerie → Carrefour Zone
+￼ bus 77 : Abobo Gendarmerie → Micao Zone Industrielle
+￼ bus 77 : Carrefour Zone → Abobo Gendarmerie
+￼ bus 77 : Micao Zone Industrielle → Abobo Gendarmerie
+￼ bus 78 : Gare Nord → Riviéra M'badon
+￼ bus 78 : Riviéra M'badon → Gare Nord
+￼ bus 81 : Gare Nord → Terminus Angré
+￼ bus 81 : Terminus Angré → Gare Nord
+￼ bus 82 : Gare Sud → Terminus Angré
+￼ bus 82 : Terminus Angré → Gare Sud
+￼ bus 83 : École de Police → Gare Nord
+￼ bus 83 : Gare Nord → École de Police
+￼ bus 83 : Gare Nord → Riviéra Sogefiha
+￼ bus 83 : Riviéra Sogefiha → Gare Nord
+￼ bus 84 : Cocody Blockausso → Gare Nord
+￼ bus 84 : Gare Nord → Cococdy Blockausso
+￼ bus 85 : Gare Campus → Yopougon Kouté
+￼ bus 85 : Gare Campus → Yopougon Phalènes
+￼ bus 85 : Yopougon Kouté → Gare Campus
+￼ bus 85 : Yopougon Phalènes → Gare Campus
+￼ bus 86 : Akouédo Village → Gare Nord
+￼ bus 86 : Gare Nord → Akouédo Village
+￼ bus 87 : Carrefour la Vie → Terminus Bingerville
+￼ bus 87 : Terminus Bingerville → Carrefour la Vie
+￼ bus 91: Adjamé Liberté → Marché de Treichville 
+￼ bus 91: Marché de Treichville → Adjamé Liberté
+￼ bus 92 : Gare Nord → Koumassi Nord-Est
+￼ bus 92 : Koumassi Nord-Est → Gare Nord...
+NB: A noter que cette liste n'est pas exhaustive, vous pouvez en rajouter.
+Bon voyage vous !
