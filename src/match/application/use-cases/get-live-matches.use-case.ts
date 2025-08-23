@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { Match } from "src/match/domain/entities/match.entity";
-import { MatchRepository } from "src/match/domain/repositories/match.repository";
-import { MATCH_REPOSITORY } from "src/match/match.module";
+import { Match } from "../../domain/entities/match.entity";
+import { MatchRepository } from "../../domain/repositories/match.repository";
+import { MATCH_REPOSITORY } from "../../domain/repositories/match.repository.token";
 
 @Injectable()
 export class GetLiveMatchesUseCase {
@@ -64,8 +64,8 @@ export class GetLiveMatchesUseCase {
             const awayShotsInsideBox = parseInt(shotsInsideBox?.away);
             const homeCorners = parseInt(corners?.home);
             const awayCorners = parseInt(corners?.away);
-        const homePossession = ballPossession && ballPossession.home ? parseInt(ballPossession.home.replace('%', '')) : 0;
-        const awayPossession = ballPossession && ballPossession.away ? parseInt(ballPossession.away.replace('%', '')) : 0;
+            const homePossession = ballPossession && ballPossession.home ? parseInt(ballPossession.home.replace('%', '')) : 0;
+            const awayPossession = ballPossession && ballPossession.away ? parseInt(ballPossession.away.replace('%', '')) : 0;
 
             // Convertir les valeurs en nombre pour comparaison premiere mi-tamps
 
@@ -83,24 +83,24 @@ export class GetLiveMatchesUseCase {
             const awayShotsInsideBox1 = parseInt(shotsInsideBox1?.away);
             const homeCorners1 = parseInt(corners1?.home);
             const awayCorners1 = parseInt(corners1?.away);
-            const homePossession1 = parseInt(ballPossession?.home.replace('%', ''));
-            const awayPossession1 = parseInt(ballPossession?.away.replace('%', ''));
+            const homePossession1 = ballPossession && ballPossession.home ? parseInt(ballPossession.home.replace('%', '')) : 0;
+            const awayPossession1 = ballPossession && ballPossession.away ? parseInt(ballPossession.away.replace('%', '')) : 0;
 
 
             // Définir les critères pour chaque mi-temps, divisés en 2 parties de 22 minutes
-            const evaluatePhase = (tempsDeJeux, attacks: number, dangerousAttacks: number, onTarget: number, offTarget: number, shotsTotal: number, shotsInsideBox: number, corners: number, possession: number) => {
+            const evaluatePhase = (tempsJeux, attacks: number, dangerousAttacks: number, onTarget: number, offTarget: number, shotsTotal: number, shotsInsideBox: number, corners: number, possession: number) => {
                 const tir = onTarget + offTarget
 
-                if (tempsDeJeux != "Finished" && tempsDeJeux != "Half Time") {
+                if (tempsJeux != "Finished" && tempsJeux != "Half Time") {
 
-                    if (tempsDeJeux > 0 && tempsDeJeux <= 10) {
+                    if (parseInt(tempsJeux) > 0 && parseInt(tempsJeux) <= 10) {
                         return (
                             attacks > 5 &&  // minimum 10 attaques
                             dangerousAttacks >= attacks * 0.3 &&  // au moins 40% des attaques sont dangereuse
                             onTarget >= 0 &&  // au moins 2 tirs cadrés
                             tir >= 4
                         );
-                    } else if (tempsDeJeux > 10 && tempsDeJeux < 16) {
+                    } else if (parseInt(tempsJeux) > 10 && parseInt(tempsJeux) < 16) {
 
                         return (
                             attacks > 6 &&  // minimum 10 attaques
@@ -108,7 +108,7 @@ export class GetLiveMatchesUseCase {
                             onTarget >= 2 &&  // au moins 2 tirs cadrés
                             tir >= 5
                         );
-                    } else if (tempsDeJeux > 16 && tempsDeJeux < 23) {
+                    } else if (parseInt(tempsJeux) > 16 && parseInt(tempsJeux) < 23) {
 
                         return (
                             attacks > 15 &&  // minimum 10 attaques
@@ -116,7 +116,7 @@ export class GetLiveMatchesUseCase {
                             onTarget >= 2 &&  // au moins 2 tirs cadrés
                             tir >= 7
                         );
-                    } else if (tempsDeJeux > 23 && tempsDeJeux < 35) {
+                    } else if (parseInt(tempsJeux) > 23 && parseInt(tempsJeux) < 35) {
 
                         return (
                             attacks > 20 &&  // minimum 10 attaques
@@ -124,7 +124,7 @@ export class GetLiveMatchesUseCase {
                             onTarget >= 3 &&  // au moins 2 tirs cadrés
                             tir >= 8
                         );
-                    } else if (tempsDeJeux > 35 && tempsDeJeux < 45) {
+                    } else if (parseInt(tempsJeux) > 35 && parseInt(tempsJeux) < 45) {
 
 
                         return (
@@ -133,28 +133,28 @@ export class GetLiveMatchesUseCase {
                             onTarget >= 4 &&  // au moins 2 tirs cadrés
                             tir >= 10
                         );
-                    } else if (tempsDeJeux > 45 && tempsDeJeux < 55) {
+                    } else if (parseInt(tempsJeux) > 45 && parseInt(tempsJeux) < 55) {
                         return (
                             attacks > 40 &&  // minimum 10 attaques
                             dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                             onTarget >= 4 && // au moins 2 tirs cadrés
                             tir > 13
                         );
-                    } else if (tempsDeJeux > 55 && tempsDeJeux < 66) {
+                    } else if (parseInt(tempsJeux) > 55 && parseInt(tempsJeux) < 66) {
                         return (
                             attacks > 40 &&  // minimum 10 attaques
                             dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                             onTarget >= 4 && // au moins 2 tirs cadrés
                             tir > 15
                         );
-                    } else if (tempsDeJeux > 66 && tempsDeJeux < 78) {
+                    } else if (parseInt(tempsJeux) > 66 && parseInt(tempsJeux) < 78) {
                         return (
                             attacks > 50 &&  // minimum 10 attaques
                             dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                             onTarget >= 5 && // au moins 2 tirs cadrés
                             tir > 17
                         );
-                    } else if (tempsDeJeux > 78 && tempsDeJeux < 90) {
+                    } else if (parseInt(tempsJeux) > 78 && parseInt(tempsJeux) < 90) {
                         return (
                             attacks > 70 &&  // minimum 10 attaques
                             dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
@@ -162,9 +162,9 @@ export class GetLiveMatchesUseCase {
                             tir > 22
                         );
                     }
-                } if (tempsDeJeux === "Finished") {
+                } if (tempsJeux === "Finished") {
                     return false
-                } else if (tempsDeJeux === "Half Time") {
+                } else if (tempsJeux === "Half Time") {
                     console.log("la mi-temps", (attacks > 30 &&  // minimum 10 attaques
                         dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                         onTarget >= 3 &&  // au moins 2 tirs cadrés
