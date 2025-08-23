@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { Match } from "../../domain/entities/match.entity";
-import { MatchRepository } from "../../domain/repositories/match.repository";
-import { MATCH_REPOSITORY } from "../../domain/repositories/match.repository.token";
+import { Match } from "src/match/domain/entities/match.entity";
+import { MatchRepository } from "src/match/domain/repositories/match.repository";
+import { MATCH_REPOSITORY } from "src/match/domain/repositories/match.repository.token";
 
 @Injectable()
 export class GetLiveMatchesUseCase {
