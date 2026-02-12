@@ -58,6 +58,33 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Lot 1 quick start
+
+```bash
+# 1) install deps
+$ npm install
+
+# 2) create local env
+$ copy .env.example .env
+
+# 3) run DB migrations (requires PostgreSQL reachable via DB_URL)
+$ npm run db:migrate
+
+# 4) run app
+$ npm run start:dev
+```
+
+Core Lot 1 endpoints:
+
+- `GET /v1/health`
+- `GET /v1/metrics/usage`
+
+Lot 1 targeted test suite:
+
+```bash
+$ npm run test:lot1
+```
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

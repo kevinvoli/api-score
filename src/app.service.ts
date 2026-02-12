@@ -1,57 +1,44 @@
-import { Injectable } from '@nestjs/common';
-import axios from 'axios';
-import {live} from './schemat/livedata'
+﻿import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { live } from './schemat/livedata';
 
 @Injectable()
 export class AppService {
-  private readonly apiUrl = 'https://livescore6.p.rapidapi.com/matches/v2/list-live?Category=soccer&Timezone=-7' ; // Remplacez par l'URL de votre API
-  private readonly authToken = 'x-rapidapi-key: 9a928af7949303ea4aa82e5c6b71a0ed6d90bbbeebdee1eafde68715adac25f3'; 
-  private readonly rapidApiHost = 'livescore6.p.rapidapi.com';
+  constructor(private readonly configService: ConfigService) {}
+
   private readonly datas = live;
-  getHello(): string {
-    return 'Hello World!';
-  }
 
-  async getLives(){
-    const APIkey = "9a928af7949303ea4aa82e5c6b71a0ed6d90bbbeebdee1eafde68715adac25f3";
-    const firstTeamId = 93;
-    const secondTeamId = 4973;
-    const met  = {
-      lives:`https://apiv3.apifootball.com/?action=get_events&APIkey=${APIkey}`,
-      countries:'Countries',
-      Leagues: 'Leagues',
+    async getLives() {
+    const apiKey = this.configService.get<string>('API_FOOTBALL_KEY');
+    const baseUrl =
+      this.configService.get<string>('API_FOOTBALL_BASE_URL') ??
+      'https://apiv3.apifootball.com';
+
+    if (!apiKey) {
+      throw new Error('Missing API_FOOTBALL_KEY');
     }
-    const countryId = '3'
-    const from = '2024-12-24'
-    const to  = '2021-05-18'
 
-    const get_leagues = 'get_leagues';
-    // const url = `https://apiv2.allsportsapi.com/football/?met=${met.lives}&APIkey=${APIkey}`;
-    const url= `https://apiv3.apifootball.com/?action=get_events&APIkey=${APIkey}&match_live=1`
-  
+    const url = `${baseUrl}/?action=get_events&APIkey=${apiKey}&match_live=1`;
+
     try {
       const response = await fetch(url, {
-        method: "GET",
+        method: 'GET',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        // timeout: 30000, // 30 secondes (optionnel, nécessite un polyfill dans Node.js)
       });
-  
+
       if (!response.ok) {
         throw new Error(`Erreur HTTP : ${response.status}`);
       }
-      const data = await response.json();
-      console.log('ici les data',data); // Affiche les résultats dans la console
 
-      const result= data.filter(match => match.statistics.length> 1)
-      console.log('ici les data',result); // Affiche les résultats dans la console
-      return result
+      const data = await response.json();
+      const result = data.filter((match) => match.statistics.length > 1);
+      return result;
     } catch (error) {
       console.error("Erreur lors de l'appel API :", error.message);
     }
   }
-
   async teste(){
     console.log('un live:', this.datas[1]);
     const affiche= [] 
@@ -99,12 +86,12 @@ export class AppService {
       const homePossession = parseInt(ballPossession?.home.replace('%', ''));
       const awayPossession = parseInt(ballPossession?.away.replace('%', ''));
   
-      // Définir les critères pour chaque mi-temps, divisés en 2 parties de 22 minutes
+      // DÃƒÂ©finir les critÃƒÂ¨res pour chaque mi-temps, divisÃƒÂ©s en 2 parties de 22 minutes
       const evaluatePhase = (attacks: number, dangerousAttacks: number, onTarget: number, shotsTotal: number, shotsInsideBox: number, corners: number, possession: number) => {
         return (
           attacks > 10 &&  // minimum 10 attaques
           dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
-          onTarget >= 2 &&  // au moins 2 tirs cadrés
+          onTarget >= 2 &&  // au moins 2 tirs cadrÃƒÂ©s
           shotsTotal >= 4 &&  // au moins 4 tirs
           shotsInsideBox >= 2 &&  // au moins 2 tirs dans la surface
           corners >= 2 &&  // au moins 2 corners
@@ -112,14 +99,14 @@ export class AppService {
         );
       };
   
-      // Diviser les critères en 2 parties de mi-temps
+      // Diviser les critÃƒÂ¨res en 2 parties de mi-temps
       const homeCriteriaFirstHalf = evaluatePhase(homeAttacks, homeDangerousAttacks, homeOnTarget, homeShotsTotal, homeShotsInsideBox, homeCorners, homePossession);
       const awayCriteriaFirstHalf = evaluatePhase(awayAttacks, awayDangerousAttacks, awayOnTarget, awayShotsTotal, awayShotsInsideBox, awayCorners, awayPossession);
   
       const homeCriteriaSecondHalf = evaluatePhase(homeAttacks, homeDangerousAttacks, homeOnTarget, homeShotsTotal, homeShotsInsideBox, homeCorners, homePossession);
       const awayCriteriaSecondHalf = evaluatePhase(awayAttacks, awayDangerousAttacks, awayOnTarget, awayShotsTotal, awayShotsInsideBox, awayCorners, awayPossession);
   
-      // Retourne true si une des équipes répond aux critères dans l'une des phases
+      // Retourne true si une des ÃƒÂ©quipes rÃƒÂ©pond aux critÃƒÂ¨res dans l'une des phases
       return (
         (homeCriteriaFirstHalf || awayCriteriaFirstHalf) ||
         (homeCriteriaSecondHalf || awayCriteriaSecondHalf)
@@ -131,3 +118,4 @@ export class AppService {
   
 
 }
+

@@ -1,22 +1,26 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { UpdateMatchDto } from './dto/update-match.dto';
-import { lastValueFrom } from 'rxjs';
-import { log } from 'console';
-
-
 
 @Injectable()
 export class MatchService {
-
-  
-    private readonly apiKey = '31ba086dcbe9820abdc7f6e5ed3ff975e6fbd06bcc101bd49855c700ceebe2f7'
+  constructor(private readonly configService: ConfigService) {}
   
   create(createMatchDto: CreateMatchDto) {
     return 'This action adds a new match';
   }
     async  fetchLiveMatches(): Promise<any[]> {
-      const url= `https://apiv3.apifootball.com/?action=get_events&APIkey=${this.apiKey}&match_live=1`
+      const apiKey = this.configService.get<string>('API_FOOTBALL_KEY');
+      const baseUrl =
+        this.configService.get<string>('API_FOOTBALL_BASE_URL') ??
+        'https://apiv3.apifootball.com';
+
+      if (!apiKey) {
+        throw new Error('Missing API_FOOTBALL_KEY');
+      }
+
+      const url= `${baseUrl}/?action=get_events&APIkey=${apiKey}&match_live=1`
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
     
