@@ -1,4 +1,4 @@
-import {
+﻿import {
   Column,
   CreateDateColumn,
   Entity,
@@ -41,7 +41,7 @@ export class Fixture {
   @Column({ type: 'int', nullable: true })
   elapsed: number | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   matchDate: Date | null;
 
   @Column({ type: 'int', nullable: true })
@@ -50,10 +50,10 @@ export class Fixture {
   @Column({ type: 'int', nullable: true })
   scoreAway: number | null;
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'json' })
   raw: Record<string, unknown>;
 
-  @Column({ type: 'timestamptz', default: () => 'now()' })
+  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   lastSyncedAt: Date;
 
   @OneToMany(() => FixtureEvent, (event) => event.fixture)
@@ -62,9 +62,10 @@ export class Fixture {
   @OneToMany(() => FixtureStatsSnapshot, (snapshot) => snapshot.fixture)
   statsSnapshots: FixtureStatsSnapshot[];
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
 }
+

@@ -57,6 +57,24 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   CORS_ORIGIN?: string;
+
+  @IsIn(['true', 'false'])
+  LIVE_FIXTURES_SYNC_ENABLED: string;
+
+  @IsInt()
+  @Min(10000)
+  @Max(300000)
+  LIVE_FIXTURES_SYNC_INTERVAL_MS: number;
+
+  @IsInt()
+  @Min(10)
+  @Max(100)
+  SYNC_RATE_LIMIT_HEADROOM_PCT: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(300000)
+  LIVE_READ_CACHE_TTL_MS: number;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

@@ -1,4 +1,4 @@
-import {
+﻿import {
   Column,
   CreateDateColumn,
   Entity,
@@ -43,9 +43,10 @@ export class FixtureEvent {
   @Column({ type: 'varchar', length: 120, nullable: true })
   detail: string | null;
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'json' })
   raw: Record<string, unknown>;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 }
+

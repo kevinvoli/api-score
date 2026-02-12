@@ -20,7 +20,7 @@ export class ApiUsageLog {
   @Column({ type: 'varchar', length: 255 })
   endpoint: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   requestParams: Record<string, unknown> | null;
 
   @Column({ type: 'int' })
@@ -32,12 +32,13 @@ export class ApiUsageLog {
   @Column({ type: 'int', nullable: true })
   rateLimitRemaining: number | null;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   calledAt: Date;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
 }
+

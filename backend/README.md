@@ -79,6 +79,34 @@ Core Lot 1 endpoints:
 - `GET /v1/health`
 - `GET /v1/metrics/usage`
 
+Lot 2 ingestion endpoints:
+
+- `POST /v1/live/fixtures/sync`
+- `GET /v1/live/fixtures`
+- `GET /v1/live/fixtures/:fixtureId/events`
+- `GET /v1/live/fixtures/:fixtureId/lineups`
+- `GET /v1/live/fixtures/:fixtureId/players`
+- `GET /v1/live/fixtures/:fixtureId/stats/latest`
+- `GET /v1/live/fixtures/:fixtureId/summary`
+- `GET /v1/live/fixtures/:fixtureId/detail`
+
+`GET /v1/live/fixtures` query params:
+
+- `page` (default: `1`)
+- `limit` (default: `20`, max: `100`)
+- `leagueId`
+- `statusShort`
+- `minElapsed`
+- `maxElapsed`
+- `teamId`
+- `sortBy` (`lastSyncedAt|matchDate|elapsed`)
+- `sortOrder` (`ASC|DESC`)
+
+Cache de lecture live:
+
+- TTL configurable via `LIVE_READ_CACHE_TTL_MS` (ms)
+- cache invalide automatiquement apres `POST /v1/live/fixtures/sync`
+
 Lot 1 targeted test suite:
 
 ```bash

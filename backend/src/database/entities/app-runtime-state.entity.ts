@@ -16,12 +16,13 @@ export class AppRuntimeState {
   @Column({ type: 'varchar', length: 120 })
   key: string;
 
-  @Column({ type: 'jsonb' })
+  @Column({ type: 'json' })
   value: Record<string, unknown>;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 }
+
