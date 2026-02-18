@@ -7,6 +7,9 @@ Convention:
 
 ## Backend & socle
 
+[DEJA REALISE] Runbook MySQL (creation DB/user, droits minimaux, migrations)
+[DEJA REALISE] Script check-db-connection.ts (exit 0/1)
+[DEJA REALISE] Tests e2e bootstrap (env valide / DB_URL absent / API_FOOTBALL_KEY absent)
 [DEJA REALISE] Config env stricte
 [DEJA REALISE] TypeORM + migrations
 [DEJA REALISE] Base MySQL (driver mysql2, config mysql)
@@ -17,9 +20,9 @@ Convention:
 
 ## Monitoring
 
-[DEJA REALISE] `GET /v1/health`
+[DEJA REALISE] `GET /v1/health` (DB check + provider check enrichis, latency_ms, timestamp_utc)
 [DEJA REALISE] `GET /v1/metrics/usage`
-[A REALISER] `GET /v1/metrics/pipeline`
+[DEJA REALISE] `GET /v1/metrics/pipeline` (fenetre glissante 5min, taux erreurs/timeouts, quota, alertes)
 
 ## Provider API-Football
 
@@ -27,7 +30,7 @@ Convention:
 [DEJA REALISE] Retry basique (429/5xx)
 [DEJA REALISE] Logging de consommation API
 [DEJA REALISE] Endpoints provider utilises: fixtures, events, statistics, lineups, players
-[A REALISER] Gestion avancee des erreurs provider/circuit breaker
+[DEJA REALISE] Gestion avancee des erreurs provider/circuit breaker (pause/resume, logs d'etat)
 
 ## Ingestion Live
 

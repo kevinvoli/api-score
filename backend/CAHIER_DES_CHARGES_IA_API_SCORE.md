@@ -55,25 +55,25 @@ Contraintes non negociables:
 - `[DEJA REALISE]` Endpoints live de consultation (fixtures/detail/summary/segments)
 
 ### 4.3 Observabilite
-- `[DEJA REALISE]` `GET /v1/health`
+- `[DEJA REALISE]` `GET /v1/health` (checks DB + provider enrichis, latency_ms, timestamp_utc)
 - `[DEJA REALISE]` `GET /v1/metrics/usage`
-- `[A REALISER]` `GET /v1/metrics/pipeline`
+- `[DEJA REALISE]` `GET /v1/metrics/pipeline` (sliding window 5min, alertes 5xx/timeout/quota)
 
 ## 5. Fonctionnalites a realiser (priorisees)
 
-## Etape 1 - Stabilisation production (priorite P0)
+## Etape 1 - Stabilisation production (priorite P0) `[DEJA REALISE 2026-02-18]`
 
 Objectif: rendre l'existant robuste et mesurable avant extension metier.
 
-- `[A REALISER]` Finaliser runbook MySQL (creation user/db, droits minimaux, backup)
-- `[A REALISER]` Ajouter checks de readiness DB/provider dans `/v1/health`
-- `[A REALISER]` Ajouter test e2e de migration + bootstrap
-- `[A REALISER]` Documenter politique de reprise sur erreur scheduler
-- `[A REALISER]` Ajouter seuils d'alerte sur taux d'erreurs provider
+- `[DEJA REALISE]` Finaliser runbook MySQL (creation user/db, droits minimaux, backup)
+- `[DEJA REALISE]` Ajouter checks de readiness DB/provider dans `/v1/health`
+- `[DEJA REALISE]` Ajouter test e2e de migration + bootstrap
+- `[DEJA REALISE]` Documenter politique de reprise sur erreur scheduler (circuit breaker)
+- `[DEJA REALISE]` Ajouter seuils d'alerte sur taux d'erreurs provider
 
 Critere de sortie Etape 1:
 - migrations executes sans intervention manuelle
-- health reflète etat DB + provider
+- health reflï¿½te etat DB + provider
 - zero erreur bloquante sur 24h de run
 
 ## Etape 2 - Module Odds (priorite P0)

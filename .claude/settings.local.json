@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm test:*)",
+      "Bash(python3:*)",
+      "Bash(npm run test:e2e:*)"
     ]
   }
 }

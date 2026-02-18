@@ -2,7 +2,8 @@
 
 Date: 2026-02-12
 Projet: `api-score`
-Statut global: `[A REALISER]`
+Statut global: `[EN COURS]`
+Derniere mise a jour: 2026-02-18
 
 ## References principales
 
@@ -36,15 +37,15 @@ Statut global: `[A REALISER]`
 
 ## Plan d'execution global (tickets)
 
-### Etape 1 - Stabilisation production
+### Etape 1 - Stabilisation production `[DEJA REALISE 2026-02-18]`
 
 Source detaillee: `BACKLOG_ETAPE_1_TICKETS.md`
 
-1. E1-T01 - Runbook MySQL + script verification
-2. E1-T02 - Readiness DB/Provider dans health
-3. E1-T03 - Test e2e migration + bootstrap
-4. E1-T04 - Strategie reprise scheduler
-5. E1-T05 - Alerting erreurs provider
+1. E1-T01 - Runbook MySQL + script verification `[DEJA REALISE]`
+2. E1-T02 - Readiness DB/Provider dans health `[DEJA REALISE]`
+3. E1-T03 - Test e2e migration + bootstrap `[DEJA REALISE]`
+4. E1-T04 - Strategie reprise scheduler `[DEJA REALISE]`
+5. E1-T05 - Alerting erreurs provider `[DEJA REALISE]`
 
 ### Etape 2 - Module Odds
 
@@ -108,6 +109,6 @@ Source detaillee: `BACKLOG_ETAPES_2_A_6_TICKETS.md`
 
 ## Prochain ticket a executer
 
-- Ticket courant recommande: `E1-T01`
+- Ticket courant recommande: `E2-T01`
 - Statut: `[A REALISER]`
-- Raison: prerequis socle prod avant extension metier
+- Raison: Etape 1 terminee - debut du module Odds

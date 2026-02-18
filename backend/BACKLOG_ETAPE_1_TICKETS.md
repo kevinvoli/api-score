@@ -2,7 +2,8 @@
 
 Date: 2026-02-12
 Reference: `CAHIER_DES_CHARGES_IA_API_SCORE.md` (Etape 1)
-Statut global: `[A REALISER]`
+Statut global: `[DEJA REALISE]`
+Date de realisation: 2026-02-18
 
 ## Objectif Etape 1
 
@@ -19,7 +20,7 @@ Rendre le backend actuel fiable en production sur MySQL avant d'ajouter les modu
 ## E1-T01 - Runbook MySQL + script de verification
 
 - Priorite: P0
-- Statut: `[A REALISER]`
+- Statut: `[DEJA REALISE]`
 - Type: Documentation + DevOps
 - But: standardiser la creation de la base, des droits et des verifications initiales.
 
@@ -49,7 +50,7 @@ Rendre le backend actuel fiable en production sur MySQL avant d'ajouter les modu
 ## E1-T02 - Readiness DB/Provider dans health
 
 - Priorite: P0
-- Statut: `[A REALISER]`
+- Statut: `[DEJA REALISE]`
 - Type: Backend API
 - But: enrichir `/v1/health` avec etat detaille des dependances.
 
@@ -75,7 +76,7 @@ Rendre le backend actuel fiable en production sur MySQL avant d'ajouter les modu
 ## E1-T03 - Test e2e migration + bootstrap
 
 - Priorite: P0
-- Statut: `[A REALISER]`
+- Statut: `[DEJA REALISE]`
 - Type: Qualite
 - But: garantir que l'application demarre proprement apres migrations.
 
@@ -96,7 +97,7 @@ Rendre le backend actuel fiable en production sur MySQL avant d'ajouter les modu
 ## E1-T04 - Strategie de reprise scheduler
 
 - Priorite: P0
-- Statut: `[A REALISER]`
+- Statut: `[DEJA REALISE]`
 - Type: Backend resilience
 - But: eviter blocage pipeline live apres erreurs transientes provider.
 
@@ -104,7 +105,7 @@ Rendre le backend actuel fiable en production sur MySQL avant d'ajouter les modu
 - Ajouter politique retry/backoff par job scheduler
 - Ajouter compteur d'echecs consecutifs par job
 - Ajouter seuil de pause temporaire (circuit-break simple)
-- Ajouter logs structurés de transition d'etat job:
+- Ajouter logs structurï¿½s de transition d'etat job:
   - active
   - throttled
   - paused
@@ -122,7 +123,7 @@ Rendre le backend actuel fiable en production sur MySQL avant d'ajouter les modu
 ## E1-T05 - Alerting erreurs provider
 
 - Priorite: P0
-- Statut: `[A REALISER]`
+- Statut: `[DEJA REALISE]`
 - Type: Observabilite
 - But: detecter rapidement une derive de la qualite de service provider.
 

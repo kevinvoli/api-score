@@ -1,0 +1,9 @@
+# Frontend
+front/node_modules/
+front/.next/
+front/.turbo/
+front/.storybook/build
+front/.storybook/cache
+
+# Logs
+*.log

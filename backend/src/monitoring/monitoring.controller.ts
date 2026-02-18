@@ -14,4 +14,9 @@ export class MonitoringController {
   getUsageMetrics() {
     return this.monitoringService.getUsageMetrics();
   }
+
+  @Get('metrics/pipeline')
+  getPipelineMetrics() {
+    return this.monitoringService.getPipelineMetrics();
+  }
 }

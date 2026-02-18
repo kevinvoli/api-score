@@ -1,0 +1,137 @@
+.card {
+  background: var(--color-surface);
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mini {
+  color: var(--color-info);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin: 0 0 4px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-family: var(--font-heading);
+}
+
+.cta {
+  border: none;
+  background: var(--color-info);
+  color: var(--color-bg);
+  padding: 8px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.15s ease;
+}
+
+.cta:active {
+  transform: scale(0.98);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.momentum {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.momentumLabel {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.momentumBar {
+  width: 100%;
+  height: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  overflow: hidden;
+}
+
+.momentumHome {
+  background: var(--color-success);
+  height: 100%;
+}
+
+.momentumAway {
+  background: var(--color-warning);
+  height: 100%;
+}
+
+.confidence {
+  min-width: 120px;
+  text-align: right;
+  font-size: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.confidence strong {
+  font-size: 2rem;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge,
+.badgeRisk {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.badge {
+  color: var(--color-info);
+  border-color: rgba(41, 182, 246, 0.4);
+}
+
+.badgeRisk {
+  color: var(--color-warning);
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}

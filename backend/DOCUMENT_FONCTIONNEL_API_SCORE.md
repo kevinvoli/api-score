@@ -25,7 +25,7 @@ A partir de maintenant, chaque fonctionnalite doit etre marquee:
 [DEJA REALISE] Module `database` TypeORM + migrations.
 [DEJA REALISE] Module `provider-api-football` (client centralise, retry, logs usage).
 [DEJA REALISE] Module `fixtures` (ingestion live + endpoints de lecture).
-[DEJA REALISE] Module `monitoring` (`/v1/health`, `/v1/metrics/usage`).
+[DEJA REALISE] Module `monitoring` (`/v1/health` enrichi DB+provider, `/v1/metrics/usage`, `/v1/metrics/pipeline`).
 [DEJA REALISE] Middleware trace-id + logs JSON + filtre d'erreurs global.
 [A REALISER] Module `odds` complet (pre-match/live + analyse drift).
 [A REALISER] Module `predictions` (fusion provider + modele interne).
@@ -50,14 +50,15 @@ A partir de maintenant, chaque fonctionnalite doit etre marquee:
 [DEJA REALISE] Ingestion statistics par fixture.
 [DEJA REALISE] Ingestion lineups par fixture.
 [DEJA REALISE] Ingestion players par fixture.
-[DEJA REALISE] Scheduler live avec garde-fou quota/rate-limit.
+[DEJA REALISE] Scheduler live avec garde-fou quota/rate-limit + circuit breaker (pause/resume automatique).
 [A REALISER] Priorisation de sync par importance match/league.
 [A REALISER] Strategie de re-sync differenciee par phase de match.
 
 ## 5) API interne exposee
 
-[DEJA REALISE] `GET /v1/health`
+[DEJA REALISE] `GET /v1/health` (checks DB + provider, latency_ms, timestamp_utc)
 [DEJA REALISE] `GET /v1/metrics/usage`
+[DEJA REALISE] `GET /v1/metrics/pipeline` (fenetre glissante 5min, alertes actives)
 [DEJA REALISE] `POST /v1/live/fixtures/sync`
 [DEJA REALISE] `GET /v1/live/fixtures` (pagination + filtres + tri)
 [DEJA REALISE] `GET /v1/live/fixtures/:fixtureId/events`
@@ -79,7 +80,8 @@ A partir de maintenant, chaque fonctionnalite doit etre marquee:
 [DEJA REALISE] Cache lecture live TTL configurable + invalidation post-sync.
 [A REALISER] AuthN/AuthZ API interne.
 [A REALISER] Dashboard Prometheus/Grafana branche.
-[A REALISER] Alerting Slack/Email.
+[DEJA REALISE] Alerting metier en memoire (erreurs 5xx, timeouts, quota bas) avec hook stub Slack/Email.
+[A REALISER] Alerting Slack/Email (integration reelle).
 
 ## 7) Regles metier summary (etat actuel)
 
@@ -91,7 +93,7 @@ A partir de maintenant, chaque fonctionnalite doit etre marquee:
 
 ## 8) Roadmap priorisee
 
-1. [A REALISER] Finaliser migration MySQL sur environnement cible (runbook + smoke tests).
+1. [DEJA REALISE] Finaliser migration MySQL sur environnement cible (runbook + smoke tests).
 2. [A REALISER] Ajouter module odds (ingestion, snapshots, derivees prix).
 3. [A REALISER] Ajouter moteur recommandations + edge + stake management.
 4. [A REALISER] Ajouter audit/backtest + KPIs ROI/drawdown/hit-rate.

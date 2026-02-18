@@ -1,0 +1,19 @@
+export type LiveFixture = {
+  id: string;
+  providerFixtureId: string;
+  leagueId: number;
+  season: number;
+  homeTeamId: number;
+  awayTeamId: number;
+  homeTeamName: string;
+  awayTeamName: string;
+  statusShort: string;
+  statusLong: string;
+  elapsed: number | null;
+  matchDate: string | null;
+  scoreHome: number | null;
+  scoreAway: number | null;
+  lastSyncedAt: string | null;
+  raw?: Record<string, unknown>;
+  confidence?: number;
+};

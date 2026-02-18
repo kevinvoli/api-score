@@ -1,0 +1,91 @@
+.row {
+  background: var(--color-surface-alt);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.market {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-info);
+  margin: 0;
+}
+
+.row h4 {
+  margin: 4px 0;
+  font-family: var(--font-heading);
+}
+
+.meta {
+  display: flex;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.metaItem {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.correlation {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.correlationLow {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--color-success);
+}
+
+.correlationMedium {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+}
+
+.correlationHigh {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error);
+}
+
+.stats {
+  text-align: right;
+  font-family: var(--font-heading);
+}
+
+.confidence {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.risk {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.remove {
+  border: none;
+  background: transparent;
+  color: var(--color-info);
+  cursor: pointer;
+}
