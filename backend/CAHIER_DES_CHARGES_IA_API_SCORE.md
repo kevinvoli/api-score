@@ -1,292 +1,226 @@
-ï»¿# Cahier des charges detaille - Implementation par IA de codage
+# Cahier des charges detaille - API SCORE
 
-Version: 1.0
+Version: 2.0
 Date: 2026-02-12
-Reference principale: `DOCUMENT_FONCTIONNEL_API_SCORE.md`
-Projet cible: NestJS TypeScript `api-score`
+References: `DOCUMENT_FONCTIONNEL_API_SCORE.md`, `FONCTIONNALITES.md`, `Systeme_Prediction_Football_Production.md`
+Projet cible: backend NestJS TypeScript `api-score` (MySQL + TypeORM)
 
-## 1. Objectif du cahier des charges
+## 1. Objectif
 
-Fournir une specification actionnable pour une IA de codage afin de livrer un backend complet de signaux/recommandations paris live football base sur API-FOOTBALL v3.
+Definir un cadre d'implementation precis pour une IA de codage afin de livrer, par etapes, un moteur de donnees live et de recommandations de paris football exploitable en production.
 
-Ce document est ecrit pour execution technique, avec exigences testables.
+## 2. Regle de suivi obligatoire
 
-## 2. Contraintes de realisation
+Toutes les fonctionnalites de ce document doivent garder un statut explicite:
+- `[DEJA REALISE]`
+- `[A REALISER]`
+
+En cas d'implementation d'une nouvelle fonctionnalite:
+- marquer `[DEJA REALISE]` dans ce fichier
+- reporter le meme changement dans `DOCUMENT_FONCTIONNEL_API_SCORE.md` et `FONCTIONNALITES.md`
+
+## 3. Contraintes techniques imposees
 
 - Langage: TypeScript
 - Framework: NestJS 10+
 - Runtime: Node.js 20+
-- Base de donnees: PostgreSQL 15+
-- ORM recommande: Prisma (ou TypeORM si impose)
+- Base de donnees: MySQL 8+
+- ORM: TypeORM
 - Validation: class-validator + class-transformer
-- HTTP provider: Axios via HttpModule Nest
-- Tests: Jest (unit + integration + e2e)
-- Lint/format: ESLint + Prettier
+- Tests: Jest (unit, integration, e2e)
+- Qualite: ESLint + Prettier
 
-Contraintes obligatoires:
-- Aucune cle API en dur.
-- Configuration via env + schema de validation.
-- Logs structures JSON.
-- Code modulaire, testable, sans logique metier en controller.
+Contraintes non negociables:
+- aucun secret en dur
+- configuration validee au demarrage (fail-fast)
+- logs JSON structures + traceId
+- erreurs homogenes `{ code, message, details, traceId }`
+- logique metier hors controllers
 
-## 3. Perimetre fonctionnel a coder
+## 4. Etat actuel du produit
 
-Inclus:
-- Ingestion live fixtures/statistics/events/odds/predictions/injuries (selon coverage).
-- Moteur de signaux v1 et recommandations.
-- API interne `/v1/live/*`, `/v1/audit/*`, `/v1/metrics/*`.
-- Persistance snapshots + audit + outcomes.
-- Monitoring quota/latence/provider errors.
+### 4.1 Socle technique
+- `[DEJA REALISE]` Config env stricte
+- `[DEJA REALISE]` Connexion MySQL via `DB_URL`
+- `[DEJA REALISE]` TypeORM + migrations
+- `[DEJA REALISE]` Logging JSON + redaction des secrets
+- `[DEJA REALISE]` Trace ID global
+- `[DEJA REALISE]` Filtre global d'erreurs
 
-Exclus (v1):
-- UI front.
-- ML complexe.
-- multi-provider federation.
+### 4.2 Ingestion et API live
+- `[DEJA REALISE]` Connecteur API-Football centralise
+- `[DEJA REALISE]` Sync fixtures live
+- `[DEJA REALISE]` Sync events/stats/lineups/players
+- `[DEJA REALISE]` Scheduler live + garde-fou quota
+- `[DEJA REALISE]` Endpoints live de consultation (fixtures/detail/summary/segments)
 
-## 4. Architecture cible a implementer
+### 4.3 Observabilite
+- `[DEJA REALISE]` `GET /v1/health`
+- `[DEJA REALISE]` `GET /v1/metrics/usage`
+- `[A REALISER]` `GET /v1/metrics/pipeline`
 
-Arborescence cible:
-- `src/modules/config`
-- `src/modules/provider-api-football`
-- `src/modules/coverage`
-- `src/modules/fixtures`
-- `src/modules/statistics`
-- `src/modules/odds`
-- `src/modules/predictions`
-- `src/modules/signals`
-- `src/modules/recommendations`
-- `src/modules/audit`
-- `src/modules/monitoring`
-- `src/common` (errors, dto base, utils, interceptors)
+## 5. Fonctionnalites a realiser (priorisees)
 
-Patterns:
-- Services metier purs.
-- Repository/data access couchee.
-- DTO explicites input/output.
-- Mappers provider -> domaine interne.
+## Etape 1 - Stabilisation production (priorite P0)
 
-## 5. Modeles de donnees (minimum a creer)
+Objectif: rendre l'existant robuste et mesurable avant extension metier.
 
-Tables minimales:
-- `countries`
-- `leagues`
-- `seasons`
-- `teams`
-- `venues`
-- `fixtures`
-- `scores`
-- `events`
-- `team_stats_snapshots`
-- `odds_snapshots`
-- `prediction_snapshots`
-- `injury_reports`
-- `signal_snapshots`
-- `bet_recommendations`
-- `api_usage_logs`
+- `[A REALISER]` Finaliser runbook MySQL (creation user/db, droits minimaux, backup)
+- `[A REALISER]` Ajouter checks de readiness DB/provider dans `/v1/health`
+- `[A REALISER]` Ajouter test e2e de migration + bootstrap
+- `[A REALISER]` Documenter politique de reprise sur erreur scheduler
+- `[A REALISER]` Ajouter seuils d'alerte sur taux d'erreurs provider
 
-Exigences DB:
-- index sur `fixtures.status`, `fixtures.date_utc`, `signal_snapshots.confidence_score`, `odds_snapshots.snapshot_at`.
-- contraintes d unicite sur couples metier (ex: fixture_id + snapshot_at + team_id + half).
-- colonnes `created_at`, `updated_at` sur tables principales.
+Critere de sortie Etape 1:
+- migrations executes sans intervention manuelle
+- health reflète etat DB + provider
+- zero erreur bloquante sur 24h de run
 
-## 6. Endpoints internes a livrer
+## Etape 2 - Module Odds (priorite P0)
 
-## 6.1 Health/metrics
-- `GET /v1/health`
-- `GET /v1/metrics/usage`
-- `GET /v1/metrics/pipeline`
+Objectif: introduire la variable prix, indispensable pour detecter la value.
 
-## 6.2 Live fixtures
-- `GET /v1/live/fixtures`
-  - query: `leagueId?`, `country?`, `minConfidence?`, `marketType?`, `page?`, `limit?`
+### 2.1 Donnees et schema
+- `[A REALISER]` Creer `odds_snapshots`
+- `[A REALISER]` Creer `odds_market_lines`
+- `[A REALISER]` Indexer `(fixture_id, captured_at)` et `(fixture_id, market_type, selection_key)`
+- `[A REALISER]` Implementer idempotence sur snapshots odds
 
-- `GET /v1/live/fixtures/:fixtureId`
+### 2.2 Ingestion
+- `[A REALISER]` Integrer endpoints API-Football odds pre-match/live
+- `[A REALISER]` Gerer indisponibilite bookmaker via fallback no-bet
+- `[A REALISER]` Stocker drift court terme (1, 3, 5 snapshots)
 
-## 6.3 Recommendations
-- `GET /v1/live/recommendations`
-  - query: `marketType?`, `minConfidence?`, `sort?`, `page?`, `limit?`
+### 2.3 Exposition
+- `[A REALISER]` Endpoint lecture latest odds par fixture
+- `[A REALISER]` Endpoint evolution cote (timeline compacte)
 
-- `GET /v1/live/recommendations/:id`
+Critere de sortie Etape 2:
+- odds live disponibles pour les fixtures suivies
+- derivees `price_drift` exploitables par moteur de decision
 
-## 6.4 Audit
-- `GET /v1/audit/recommendations`
-- `GET /v1/audit/recommendations/:id/outcome`
+## Etape 3 - Module Signaux & Recommandations (priorite P0)
 
-API contract:
-- reponses JSON versionnees.
-- format erreur unique: `{ code, message, details, traceId }`.
+Objectif: transformer donnees live + odds en recommandations actionnables.
 
-## 7. Connecteur API-FOOTBALL - exigences detaillees
+### 3.1 Features et scoring
+- `[A REALISER]` Calcul `danger_ratio`
+- `[A REALISER]` Calcul `shot_pressure`
+- `[A REALISER]` Calcul `on_target_ratio`
+- `[A REALISER]` Calcul `corner_pressure_10m`
+- `[A REALISER]` Calcul `goal_likelihood_score` (0-100)
+- `[A REALISER]` Calcul `market_alignment_score` (0-100)
+- `[A REALISER]` Calcul `confidence_score` (0-100)
 
-A coder dans `provider-api-football`:
-- client HTTP centralise avec:
-  - timeout configurable,
-  - retry exponentiel pour 429/5xx,
-  - gestion rate-limit headers,
-  - logs request/response sanitizes.
+### 3.2 Regles de publication
+- `[A REALISER]` Regle publication `confidence >= 70`
+- `[A REALISER]` Blocage si flags critiques (qualite faible, contexte rouge)
+- `[A REALISER]` Generer `reasons[]` et `risk_flags[]` auditable
 
-Fonctions minimales:
-- `fetchLiveFixtures()`
-- `fetchFixturesByIds(ids: number[])`
-- `fetchFixtureEvents(fixtureId)`
-- `fetchFixtureStatistics(fixtureId, half?)`
-- `fetchFixtureLineups(fixtureId)`
-- `fetchFixturePlayers(fixtureId)`
-- `fetchOddsLive(fixtureId?)`
-- `fetchOddsPrematch(fixtureId/date/league)`
-- `fetchPredictions(fixtureId)`
-- `fetchInjuries(teamId/league/season)`
-- `fetchLeaguesCoverage()`
+### 3.3 Persistance et API
+- `[A REALISER]` Creer `signal_snapshots`
+- `[A REALISER]` Creer `bet_recommendations`
+- `[A REALISER]` `GET /v1/live/recommendations`
+- `[A REALISER]` `GET /v1/live/recommendations/:id`
 
-## 8. Moteur de signaux - specifications calcul
+Critere de sortie Etape 3:
+- recommandations live produites de facon stable
+- chaque recommandation est explicable (raisons + risques + score)
 
-Variables obligatoires:
-- `danger_ratio`
-- `shot_pressure`
-- `on_target_ratio`
-- `corner_pressure_10m`
-- `price_drift`
+## Etape 4 - Audit, settlement et performance (priorite P1)
 
-Scores obligatoires:
-- `goal_likelihood_score` (0..100)
-- `market_alignment_score` (0..100)
-- `confidence_score` (0..100)
+Objectif: mesurer la qualite reelle des recommandations.
 
-Politique de decision v1:
-- publier recommandation si `confidence_score >= 70`.
-- bloquer si `risk_flags` contient `LOW_DATA_QUALITY` ou `RED_CARD_AGAINST_SIGNAL`.
+- `[A REALISER]` Enregistrer issue finale des paris (won/lost/void)
+- `[A REALISER]` Calculer KPIs: hit-rate, ROI, yield, drawdown, CLV simple
+- `[A REALISER]` `GET /v1/audit/recommendations`
+- `[A REALISER]` `GET /v1/audit/recommendations/:id/outcome`
+- `[A REALISER]` Job de settlement post-match
 
-Sortie recommandation obligatoire:
-- `market_type`
-- `selection`
-- `current_odd`
-- `min_acceptable_odd`
-- `value_edge_pct`
-- `reasons[]`
-- `risk_flags[]`
+Critere de sortie Etape 4:
+- historique auditable complet
+- KPIs fiables sur periodes glissantes (7j, 30j)
 
-## 9. Scheduler et frequence
+## Etape 5 - Bankroll & risk management (priorite P1)
 
-A implementer via `@nestjs/schedule`:
-- job `live-fixtures` toutes 15-30 sec (selon plan).
-- job `live-stats` toutes 60 sec.
-- job `odds-live` toutes 30-60 sec.
-- job `coverage-refresh` 1 fois/jour.
-- job `settlement` post-match toutes 10 min.
+Objectif: encadrer la prise de risque pour un usage professionnel.
 
-Le scheduler doit s auto-throttler selon quota restant.
+- `[A REALISER]` Mode stake fixe
+- `[A REALISER]` Mode Kelly fractionnel borne
+- `[A REALISER]` Limite d'exposition par ligue/marche
+- `[A REALISER]` Coupe-circuit drawdown journalier
+- `[A REALISER]` Raison explicite de refus de bet
 
-## 10. Securite et configuration
+Critere de sortie Etape 5:
+- aucune recommandation sans taille de mise et garde-fous
 
-Variables env minimales:
-- `PORT`
-- `NODE_ENV`
-- `DB_URL`
-- `API_FOOTBALL_BASE_URL`
-- `API_FOOTBALL_KEY`
-- `API_FOOTBALL_HOST`
-- `REQUEST_TIMEOUT_MS`
-- `RETRY_MAX`
-- `RATE_LIMIT_PER_MIN`
+## Etape 6 - Prediction engine avance (priorite P2)
 
-A coder:
-- module config avec validation Joi/Zod.
-- bootstrap qui echoue si env invalide.
+Objectif: evoluer de l'heuristique vers un modele calibre.
 
-## 11. Observabilite
+- `[A REALISER]` Service de prediction dedie (module separe)
+- `[A REALISER]` Fusion API-Football + signaux historiques internes
+- `[A REALISER]` Calibration probabiliste periodique
+- `[A REALISER]` Versionnement des modeles et tracabilite des sorties
 
-A fournir:
-- correlation id middleware.
-- logs JSON (niveau info/warn/error).
-- metriques: calls provider, latence p95, erreurs 4xx/5xx, recommendations/min.
-- endpoint interne metrics agreges.
+Critere de sortie Etape 6:
+- gain mesure vs baseline heuristique
+- rollback modele possible en 1 action
 
-## 12. Tests obligatoires
+## 6. Entites, champs et relations (cible)
 
-## 12.1 Unit tests
-- calcul `danger_ratio`, `shot_pressure`, `price_drift`.
-- scoring et decision publication.
-- mapping provider payload -> entites internes.
+### 6.1 Entites existantes
+- `[DEJA REALISE]` `fixtures`
+- `[DEJA REALISE]` `fixture_events`
+- `[DEJA REALISE]` `fixture_stats_snapshots`
+- `[DEJA REALISE]` `fixture_lineups`
+- `[DEJA REALISE]` `fixture_player_stats_snapshots`
+- `[DEJA REALISE]` `api_usage_logs`
+- `[DEJA REALISE]` `app_runtime_state`
 
-## 12.2 Integration tests
-- provider client avec mocks HTTP (success, timeout, 429, 500).
-- persistence snapshots et idempotence.
+### 6.2 Entites a ajouter
+- `[A REALISER]` `odds_snapshots`
+  Champs minimum: `id`, `fixture_id`, `captured_at`, `bookmaker`, `market_type`, `selection_key`, `odd`, `created_at`
+- `[A REALISER]` `signal_snapshots`
+  Champs minimum: `id`, `fixture_id`, `captured_at`, `danger_ratio`, `shot_pressure`, `price_drift`, `confidence_score`, `risk_flags_json`
+- `[A REALISER]` `bet_recommendations`
+  Champs minimum: `id`, `fixture_id`, `created_at`, `market_type`, `selection`, `current_odd`, `min_acceptable_odd`, `value_edge_pct`, `stake_pct`, `status`
+- `[A REALISER]` `bet_outcomes`
+  Champs minimum: `id`, `recommendation_id`, `settled_at`, `result`, `pnl_unit`, `closing_odd`
 
-## 12.3 E2E tests
-- `GET /v1/live/recommendations` retourne contrat valide.
-- filtres query fonctionnent.
-- gestion erreurs standardisee.
+### 6.3 Relations
+- `[A REALISER]` `fixtures` 1-N `odds_snapshots`
+- `[A REALISER]` `fixtures` 1-N `signal_snapshots`
+- `[A REALISER]` `fixtures` 1-N `bet_recommendations`
+- `[A REALISER]` `bet_recommendations` 1-1 `bet_outcomes`
 
-Seuil de qualite:
-- coverage tests >= 80% sur modules `signals` et `recommendations`.
+## 7. Exigences API (contrat)
 
-## 13. Plan de livraison par lots
+- `[DEJA REALISE]` Reponse JSON normalisee
+- `[DEJA REALISE]` Format erreur unifie
+- `[A REALISER]` Pagination standard sur endpoints volumineux
+- `[A REALISER]` Filtrage par `leagueId`, `marketType`, `minConfidence`, `status`
+- `[A REALISER]` Tri standard (`createdAt`, `confidence`, `edge`)
 
-Lot 1 - Fondations techniques:
-- config/env, db, logging, error handling, health.
+## 8. Exigences tests
 
-Lot 2 - Provider + fixtures:
-- client API-FOOTBALL, ingestion fixtures/events/stats, persistence.
+- `[A REALISER]` Unit tests: formules de features et scoring
+- `[A REALISER]` Integration: provider client (timeouts, 429, 5xx)
+- `[A REALISER]` Integration: idempotence de snapshots
+- `[A REALISER]` E2E: flux recommendation complet
+- `[A REALISER]` Coverage minimal 80% sur modules `signals` et `recommendations`
 
-Lot 3 - Signals v1:
-- feature engineering, scoring, raisons/risques.
+## 9. Definition of Done globale
 
-Lot 4 - Recommendations + API:
-- endpoints live/audit + pagination/filtres.
+Une fonctionnalite passe de `[A REALISER]` a `[DEJA REALISE]` seulement si:
+- code merge
+- migration appliquee (si schema touche)
+- tests associes verts
+- endpoints verifies manuellement (ou e2e)
+- documentation des 3 fichiers mise a jour
 
-Lot 5 - Odds/predictions/injuries:
-- enrichissements et price alignment.
+## 10. Prompt standard pour IA de codage
 
-Lot 6 - Monitoring + hardening:
-- metrics, quota guard, tests complets, documentation technique.
-
-## 14. Definition of Done (DoD)
-
-Une livraison est acceptee si:
-- tous endpoints du lot repondent au contrat,
-- tests unit/integration/e2e passent en CI,
-- aucune cle secrete en code,
-- logs et metriques disponibles,
-- documentation de module mise a jour,
-- changelog lot fourni.
-
-## 15. Prompt de production pour IA de codage (copiable)
-
-"Tu implementes le projet NestJS selon `DOCUMENT_FONCTIONNEL_API_SCORE.md` et ce cahier des charges.
-Respecte strictement:
-1) architecture modulaire,
-2) zero secret hardcode,
-3) contrats API definis,
-4) tests obligatoires,
-5) logs/metrics.
-Travaille par lots numerotes (Lot 1 -> Lot 6).
-A la fin de chaque lot, fournis:
-- fichiers modifies,
-- migrations DB,
-- tests ajoutes,
-- commandes de verification,
-- limites connues.
-N implemente pas de fonctionnalite hors perimetre sans section explicite `Out of Scope`.
-"
-
-## 16. Risques projet et mitigation
-
-Risque 1: quotas insuffisants
-- Mitigation: coverage gate + cache + polling adaptatif.
-
-Risque 2: heterogeneite des ligues
-- Mitigation: seuils par ligue et fallback no-bet.
-
-Risque 3: sur-optimisme des regles
-- Mitigation: backtest, calibration, suivi CLV.
-
-Risque 4: dette technique rapide
-- Mitigation: lots courts, tests stricts, revues de schema.
-
-## 17. Livrables attendus finaux
-
-- Code backend NestJS modulaire.
-- Schema DB + migrations.
-- Tests automatiques.
-- Documentation API interne (OpenAPI).
-- Runbook exploitation (quota, incidents provider, reprocessing).
+"Implementer uniquement le prochain lot prioritaire marque `[A REALISER]` dans `CAHIER_DES_CHARGES_IA_API_SCORE.md`.
+Contraintes strictes: MySQL + TypeORM, aucun secret hardcode, architecture NestJS modulaire, tests obligatoires, logs JSON, erreurs homogenes.
+A la fin: fournir fichiers modifies, migrations, tests, commandes de verification, et mettre a jour `DOCUMENT_FONCTIONNEL_API_SCORE.md` + `FONCTIONNALITES.md` + `CAHIER_DES_CHARGES_IA_API_SCORE.md` avec statuts."
