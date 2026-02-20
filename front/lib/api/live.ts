@@ -12,7 +12,9 @@ export const fetchLiveFixtures = async (params?: {
   sortBy?: 'lastSyncedAt' | 'matchDate' | 'elapsed';
   sortOrder?: 'ASC' | 'DESC';
 }): Promise<{ items: LiveFixture[]; page: number; limit: number; total: number }> => {
-  return apiFetch('/v1/live/fixtures', { query: params });
+  return apiFetch<{ items: LiveFixture[]; page: number; limit: number; total: number }>('/v1/live/fixtures', {
+    query: params
+  });
 };
 
 export const fetchFixtureSummary = async (fixtureId: string) => {

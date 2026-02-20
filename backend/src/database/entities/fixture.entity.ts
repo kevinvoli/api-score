@@ -32,6 +32,21 @@ export class Fixture {
   @Column({ type: 'int', nullable: true })
   awayTeamId: number | null;
 
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  homeTeamName: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  awayTeamName: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  homeTeamBadge: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  awayTeamBadge: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  leagueName: string | null;
+
   @Column({ type: 'varchar', length: 20, nullable: true })
   statusShort: string | null;
 

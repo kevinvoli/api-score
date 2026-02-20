@@ -14,6 +14,7 @@ export type RecommendationCardProps = {
     riskFlags: string[];
     status: 'NEW' | 'ACTIVE' | 'REJECTED';
   };
+  fixtureLabel?: string;
   onAddCoupon?: (id: string) => void;
 };
 
@@ -28,32 +29,56 @@ const badgeColor = (status: RecommendationCardProps['recommendation']['status'])
   }
 };
 
-export function RecommendationCard({ recommendation, onAddCoupon }: RecommendationCardProps) {
+const marketLabel = (marketType: string) => {
+  const normalized = marketType.toLowerCase();
+  if (normalized === 'match winner') return 'Vainqueur du match';
+  if (normalized === 'goals over/under') return 'Buts +/−';
+  if (normalized === 'both teams to score') return 'Les deux Ã©quipes marquent';
+  return marketType;
+};
+
+const statusLabel = (status: RecommendationCardProps['recommendation']['status']) => {
+  switch (status) {
+    case 'ACTIVE':
+      return 'Actif';
+    case 'REJECTED':
+      return 'Rejeté';
+    default:
+      return 'Nouveau';
+  }
+};
+
+export function RecommendationCard({
+  recommendation,
+  fixtureLabel,
+  onAddCoupon
+}: RecommendationCardProps) {
   return (
     <article className={styles.card}>
       <header className={styles.header}>
         <div>
-          <p className={styles.tag}>{recommendation.marketType}</p>
+          <p className={styles.tag}>{marketLabel(recommendation.marketType)}</p>
           <h3>{recommendation.selection}</h3>
+          {fixtureLabel && <p className={styles.fixture}>{fixtureLabel}</p>}
         </div>
         <span className={`${styles.status} ${badgeColor(recommendation.status)}`}>
-          {recommendation.status}
+          {statusLabel(recommendation.status)}
         </span>
       </header>
 
       <section className={styles.metrics}>
         <div>
-          <p>Edge</p>
+          <p>Avantage</p>
           <strong>{recommendation.edgePct.toFixed(1)}%</strong>
         </div>
         <div>
-          <p>Confidence</p>
+          <p>Confiance</p>
           <strong>{recommendation.confidenceScore}</strong>
         </div>
         <div>
-          <p>Odd</p>
+          <p>Cote</p>
           <strong>{recommendation.currentOdd.toFixed(2)}</strong>
-          <span className={styles.minOdd}>min {recommendation.minAcceptableOdd.toFixed(2)}</span>
+          <span className={styles.minOdd}>cote min {recommendation.minAcceptableOdd.toFixed(2)}</span>
         </div>
       </section>
 

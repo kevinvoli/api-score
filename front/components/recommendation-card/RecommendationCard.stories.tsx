@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+﻿import type { Meta, StoryObj } from '@storybook/react';
 import { RecommendationCard } from './RecommendationCard';
 
 const meta: Meta<typeof RecommendationCard> = {
@@ -18,7 +18,8 @@ const meta: Meta<typeof RecommendationCard> = {
       reasons: ['Momentum part en faveur', 'Statistiques home dominantes', 'Value edge confirmé'],
       riskFlags: [],
       status: 'ACTIVE'
-    }
+    },
+    fixtureLabel: 'Paris FC vs Lyon FC'
   }
 };
 
@@ -35,7 +36,8 @@ export const Risky: Story = {
       id: 'rec-2',
       status: 'REJECTED',
       confidenceScore: 52,
-      riskFlags: ['Stade humide', 'Market drift']
-    }
+      riskFlags: ['Stade humide', 'Marché instable']
+    },
+    fixtureLabel: 'Paris FC vs Lyon FC'
   }
 };

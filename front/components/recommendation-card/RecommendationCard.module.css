@@ -11,7 +11,7 @@
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .tag {
@@ -27,6 +27,13 @@
   font-size: 1.2rem;
   font-family: var(--font-heading);
 }
+
+.fixture {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
 
 .status {
   font-size: 0.75rem;

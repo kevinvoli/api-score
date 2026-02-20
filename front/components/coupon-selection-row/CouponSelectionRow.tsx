@@ -3,6 +3,7 @@ import styles from './CouponSelectionRow.module.css';
 export type CouponSelectionRowProps = {
   selection: string;
   marketType: string;
+  fixtureLabel?: string;
   odd: number;
   confidence: number;
   edgePct: number;
@@ -20,6 +21,7 @@ const correlationColor = {
 export function CouponSelectionRow({
   selection,
   marketType,
+  fixtureLabel,
   odd,
   confidence,
   edgePct,
@@ -32,6 +34,7 @@ export function CouponSelectionRow({
       <div>
         <p className={styles.market}>{marketType}</p>
         <h4>{selection}</h4>
+        {fixtureLabel && <p className={styles.fixture}>{fixtureLabel}</p>}
         <div className={styles.meta}>
           <span className={styles.metaItem}>Odds {odd.toFixed(2)}</span>
           <span className={styles.metaItem}>Edge {edgePct.toFixed(1)}%</span>

@@ -7,6 +7,9 @@ export type LiveFixture = {
   awayTeamId: number;
   homeTeamName: string;
   awayTeamName: string;
+  homeTeamBadge?: string | null;
+  awayTeamBadge?: string | null;
+  leagueName?: string | null;
   statusShort: string;
   statusLong: string;
   elapsed: number | null;

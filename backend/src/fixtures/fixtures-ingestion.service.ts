@@ -8,6 +8,7 @@ import { FixtureLineup } from '../database/entities/fixture-lineup.entity';
 import { FixturePlayerStatsSnapshot } from '../database/entities/fixture-player-stats-snapshot.entity';
 import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapshot.entity';
 import { Fixture } from '../database/entities/fixture.entity';
+import { Team } from '../database/entities/team.entity';
 import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
 import { GetLiveFixturesQueryDto } from './dto/get-live-fixtures-query.dto';
 
@@ -30,6 +31,8 @@ export class FixturesIngestionService {
     private readonly fixturePlayerStatsSnapshotRepository: Repository<FixturePlayerStatsSnapshot>,
     @InjectRepository(FixtureStatsSnapshot)
     private readonly fixtureStatsSnapshotRepository: Repository<FixtureStatsSnapshot>,
+    @InjectRepository(Team)
+    private readonly teamRepository: Repository<Team>,
   ) {
     this.cacheTtlMs = this.configService.get<number>('LIVE_READ_CACHE_TTL_MS', 30000);
   }
@@ -56,17 +59,35 @@ export class FixturesIngestionService {
       }
       persistedFixtures.push(fixture);
 
+    if (fixture.leagueId) {
+      await this.upsertTeamsByLeague(fixture.leagueId);
+    }
+    await this.fillFixtureTeamsFromRepository(fixture);
+
       const fixtureId = Number(fixture.providerFixtureId);
       const events = await this.apiFootballClient.fetchFixtureEvents(fixtureId);
       eventsSynced += await this.replaceFixtureEvents(fixture.id, events);
 
-      const stats = await this.apiFootballClient.fetchFixtureStatistics(fixtureId);
+      const stats = await this.apiFootballClient.fetchFixtureStatistics(
+        fixtureId,
+        undefined,
+        {
+          homeTeamId: fixture.homeTeamId ?? null,
+          awayTeamId: fixture.awayTeamId ?? null,
+        },
+      );
       statsSynced += await this.insertStatsSnapshots(fixture.id, stats, fixture.elapsed);
 
-      const lineups = await this.apiFootballClient.fetchFixtureLineups(fixtureId);
+      const lineups = await this.apiFootballClient.fetchFixtureLineups(fixtureId, {
+        homeTeamId: fixture.homeTeamId ?? null,
+        awayTeamId: fixture.awayTeamId ?? null,
+      });
       lineupsSynced += await this.replaceFixtureLineups(fixture.id, lineups);
 
-      const players = await this.apiFootballClient.fetchFixturePlayers(fixtureId);
+      const players = await this.apiFootballClient.fetchFixturePlayers(fixtureId, {
+        homeTeamId: fixture.homeTeamId ?? null,
+        awayTeamId: fixture.awayTeamId ?? null,
+      });
       playerStatsSynced += await this.insertPlayerStatsSnapshots(
         fixture.id,
         players,
@@ -152,6 +173,17 @@ export class FixturesIngestionService {
     const result = { items, page, limit, total };
     this.setCache(cacheKey, result);
     return result;
+  }
+
+  async getFixturesHistory(
+    query: { limit?: number },
+  ): Promise<{ items: Fixture[]; limit: number }> {
+    const limit = query.limit ?? 10;
+    const items = await this.fixtureRepository.find({
+      order: { matchDate: 'DESC', lastSyncedAt: 'DESC' },
+      take: limit,
+    });
+    return { items, limit };
   }
 
   async getFixtureEvents(fixtureId: number): Promise<FixtureEvent[]> {
@@ -432,13 +464,38 @@ export class FixturesIngestionService {
       return null;
     }
 
+    if (normalized.homeTeamId && (!normalized.homeTeamName || !normalized.homeTeamBadge)) {
+      const team = await this.upsertTeamById(normalized.homeTeamId);
+      if (team?.name) {
+        normalized.homeTeamName = team.name;
+      }
+      if (team?.badge) {
+        normalized.homeTeamBadge = team.badge;
+      }
+    }
+
+    if (normalized.awayTeamId && (!normalized.awayTeamName || !normalized.awayTeamBadge)) {
+      const team = await this.upsertTeamById(normalized.awayTeamId);
+      if (team?.name) {
+        normalized.awayTeamName = team.name;
+      }
+      if (team?.badge) {
+        normalized.awayTeamBadge = team.badge;
+      }
+    }
+
     await this.fixtureRepository.upsert(
       {
         providerFixtureId: normalized.providerFixtureId,
         leagueId: normalized.leagueId,
+        leagueName: normalized.leagueName,
         season: normalized.season,
         homeTeamId: normalized.homeTeamId,
         awayTeamId: normalized.awayTeamId,
+        homeTeamName: normalized.homeTeamName,
+        awayTeamName: normalized.awayTeamName,
+        homeTeamBadge: normalized.homeTeamBadge,
+        awayTeamBadge: normalized.awayTeamBadge,
         statusShort: normalized.statusShort,
         statusLong: normalized.statusLong,
         elapsed: normalized.elapsed,
@@ -454,6 +511,115 @@ export class FixturesIngestionService {
     return this.fixtureRepository.findOne({
       where: { providerFixtureId: normalized.providerFixtureId },
     });
+  }
+
+  private async upsertTeamsByLeague(leagueId: number): Promise<void> {
+    const teams = await this.apiFootballClient.fetchTeamsByLeague(leagueId);
+    if (!teams.length) {
+      return;
+    }
+
+    const rows = teams.map((team) => this.normalizeTeamPayload(team, leagueId)).filter(Boolean) as Team[];
+    if (!rows.length) {
+      return;
+    }
+
+    await this.teamRepository.upsert(rows, ['teamKey']);
+  }
+
+  private async upsertTeamById(teamId: number): Promise<Team | null> {
+    const payload = await this.apiFootballClient.fetchTeamById(teamId);
+    if (!payload) {
+      return null;
+    }
+
+    const row = this.normalizeTeamPayload(payload, null);
+    if (!row) {
+      return null;
+    }
+
+    await this.teamRepository.upsert(row, ['teamKey']);
+    return this.teamRepository.findOne({ where: { teamKey: row.teamKey } });
+  }
+
+  private async fillFixtureTeamsFromRepository(fixture: Fixture): Promise<void> {
+    if (!fixture.homeTeamId && !fixture.awayTeamId) {
+      return;
+    }
+
+    const [homeTeam, awayTeam] = await Promise.all([
+      fixture.homeTeamId
+        ? this.teamRepository.findOne({ where: { teamKey: fixture.homeTeamId } })
+        : Promise.resolve(null),
+      fixture.awayTeamId
+        ? this.teamRepository.findOne({ where: { teamKey: fixture.awayTeamId } })
+        : Promise.resolve(null),
+    ]);
+
+    const updates: Partial<Fixture> = {};
+    if (!fixture.homeTeamName && homeTeam?.name) {
+      updates.homeTeamName = homeTeam.name;
+    }
+    if (!fixture.awayTeamName && awayTeam?.name) {
+      updates.awayTeamName = awayTeam.name;
+    }
+    if (!fixture.homeTeamBadge && homeTeam?.badge) {
+      updates.homeTeamBadge = homeTeam.badge;
+    }
+    if (!fixture.awayTeamBadge && awayTeam?.badge) {
+      updates.awayTeamBadge = awayTeam.badge;
+    }
+
+    if (Object.keys(updates).length) {
+      await this.fixtureRepository.update({ id: fixture.id }, updates);
+    }
+  }
+
+  private normalizeTeamPayload(payload: Record<string, any>, leagueId: number | null): Team | null {
+    const teamKey = this.toNumber(payload?.team_key ?? payload?.team?.id ?? payload?.team_id);
+    const name =
+      payload?.team_name ??
+      payload?.team?.name ??
+      payload?.name ??
+      null;
+
+    if (!teamKey || !name) {
+      return null;
+    }
+
+    const venuePayload = payload?.venue ?? payload?.team?.venue ?? null;
+    const venueId = this.toNumber(venuePayload?.id ?? payload?.venue_id);
+
+    return {
+      id: undefined as unknown as string,
+      teamKey,
+      name,
+      code:
+        payload?.team_code ??
+        payload?.team?.code ??
+        payload?.code ??
+        null,
+      country: payload?.team_country ?? payload?.team?.country ?? payload?.country ?? null,
+      founded: this.toNumber(payload?.team_founded ?? payload?.team?.founded ?? payload?.founded),
+      national:
+        payload?.team_national ??
+        payload?.team?.national ??
+        payload?.national ??
+        null,
+      badge: payload?.team_badge ?? payload?.team?.logo ?? payload?.logo ?? null,
+      venueId,
+      venueName: venuePayload?.name ?? payload?.venue_name ?? null,
+      venueAddress: venuePayload?.address ?? payload?.venue_address ?? null,
+      venueCity: venuePayload?.city ?? payload?.venue_city ?? null,
+      venueCapacity: this.toNumber(venuePayload?.capacity ?? payload?.venue_capacity),
+      venueSurface: venuePayload?.surface ?? payload?.venue_surface ?? null,
+      venueImage: venuePayload?.image ?? payload?.venue_image ?? null,
+      venue: venuePayload,
+      leagueId,
+      raw: payload,
+      createdAt: undefined as unknown as Date,
+      updatedAt: undefined as unknown as Date,
+    } as Team;
   }
 
   private async replaceFixtureEvents(
@@ -574,9 +740,14 @@ export class FixturesIngestionService {
   private normalizeFixturePayload(payload: Record<string, any>): {
     providerFixtureId: string | null;
     leagueId: number | null;
+    leagueName: string | null;
     season: number | null;
     homeTeamId: number | null;
     awayTeamId: number | null;
+    homeTeamName: string | null;
+    awayTeamName: string | null;
+    homeTeamBadge: string | null;
+    awayTeamBadge: string | null;
     statusShort: string | null;
     statusLong: string | null;
     elapsed: number | null;
@@ -593,9 +764,30 @@ export class FixturesIngestionService {
     return {
       providerFixtureId,
       leagueId: payload?.league?.id ?? this.toNumber(payload?.league_id) ?? null,
+      leagueName:
+        payload?.league?.name ??
+        payload?.league?.league_name ??
+        payload?.league_name ??
+        null,
       season: payload?.league?.season ?? this.toNumber(payload?.league_year) ?? null,
       homeTeamId: payload?.teams?.home?.id ?? this.toNumber(payload?.match_hometeam_id) ?? null,
       awayTeamId: payload?.teams?.away?.id ?? this.toNumber(payload?.match_awayteam_id) ?? null,
+      homeTeamName:
+        payload?.teams?.home?.name ??
+        payload?.match_hometeam_name ??
+        null,
+      awayTeamName:
+        payload?.teams?.away?.name ??
+        payload?.match_awayteam_name ??
+        null,
+      homeTeamBadge:
+        payload?.teams?.home?.logo ??
+        payload?.team_home_badge ??
+        null,
+      awayTeamBadge:
+        payload?.teams?.away?.logo ??
+        payload?.team_away_badge ??
+        null,
       statusShort: apiSportsFixture?.status?.short ?? payload?.match_status ?? null,
       statusLong: apiSportsFixture?.status?.long ?? payload?.match_status ?? null,
       elapsed: apiSportsFixture?.status?.elapsed ?? this.toNumber(payload?.match_status) ?? null,

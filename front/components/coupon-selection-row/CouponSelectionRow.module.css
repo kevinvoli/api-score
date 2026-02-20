@@ -22,6 +22,12 @@
   font-family: var(--font-heading);
 }
 
+.fixture {
+  margin: 0 0 6px;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
 .meta {
   display: flex;
   gap: 10px;

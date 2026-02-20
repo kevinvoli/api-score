@@ -3,6 +3,7 @@ import { create } from 'zustand';
 export type CouponSelection = {
   id: string;
   selection: string;
+  fixtureLabel?: string;
   odd: number;
   confidence: number;
   edge: number;

@@ -1,4 +1,5 @@
 import { Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { GetFixturesHistoryQueryDto } from './dto/get-fixtures-history-query.dto';
 import { GetLiveFixturesQueryDto } from './dto/get-live-fixtures-query.dto';
 import { FixturesIngestionService } from './fixtures-ingestion.service';
 
@@ -14,6 +15,11 @@ export class FixturesController {
   @Get()
   getLatestFixtures(@Query() query: GetLiveFixturesQueryDto) {
     return this.fixturesIngestionService.getLatestFixtures(query);
+  }
+
+  @Get('history')
+  getFixturesHistory(@Query() query: GetFixturesHistoryQueryDto) {
+    return this.fixturesIngestionService.getFixturesHistory(query);
   }
 
   @Get(':fixtureId/events')

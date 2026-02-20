@@ -1,4 +1,4 @@
-import styles from './MatchCardLive.module.css';
+﻿import styles from './MatchCardLive.module.css';
 
 export type MatchCardLiveProps = {
   fixture: {
@@ -42,9 +42,11 @@ export function MatchCardLive({
     <article className={styles.card}>
       <header className={styles.header}>
         <div>
-          <p className={styles.mini}>{fixture.statusShort} · {fixture.elapsed}'</p>
+          <p className={styles.mini}>{fixture.statusShort} Â· {fixture.elapsed}â€™</p>
           <h2>
-            {fixture.homeTeamName} {fixture.scoreHome} - {fixture.scoreAway} {fixture.awayTeamName}
+            <span className={styles.teamRow}>{fixture.homeTeamName}</span>
+            <span className={styles.score}>{fixture.scoreHome} - {fixture.scoreAway}</span>
+            <span className={styles.teamRow}>{fixture.awayTeamName}</span>
           </h2>
         </div>
         <button className={styles.cta} type="button" onClick={onAnalyze}>

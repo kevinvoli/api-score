@@ -6,6 +6,7 @@ import { FixtureLineup } from '../database/entities/fixture-lineup.entity';
 import { FixturePlayerStatsSnapshot } from '../database/entities/fixture-player-stats-snapshot.entity';
 import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapshot.entity';
 import { Fixture } from '../database/entities/fixture.entity';
+import { Team } from '../database/entities/team.entity';
 import { ProviderApiFootballModule } from '../provider-api-football/provider-api-football.module';
 import { FixturesController } from './fixtures.controller';
 import { FixturesIngestionService } from './fixtures-ingestion.service';
@@ -21,6 +22,7 @@ import { FixturesSyncScheduler } from './fixtures-sync.scheduler';
       FixtureLineup,
       FixturePlayerStatsSnapshot,
       FixtureStatsSnapshot,
+      Team,
     ]),
   ],
   controllers: [FixturesController],
