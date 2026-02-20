@@ -11,7 +11,7 @@ export class TraceIdMiddleware implements NestMiddleware {
     const incomingTraceId = req.header('x-trace-id');
     const traceId = incomingTraceId && incomingTraceId.trim() ? incomingTraceId : randomUUID();
 
-    req.traceId = traceId;
+    (req as { traceId?: string }).traceId = traceId;
     res.setHeader('x-trace-id', traceId);
 
     this.asyncContextService.run(traceId, next);

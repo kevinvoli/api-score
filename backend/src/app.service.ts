@@ -28,6 +28,8 @@ export class AppService {
         },
       });
 
+      console.log("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", response);
+      
       if (!response.ok) {
         throw new Error(`Erreur HTTP : ${response.status}`);
       }
@@ -36,6 +38,7 @@ export class AppService {
       const result = data.filter((match) => match.statistics.length > 1);
       return result;
     } catch (error) {
+      console.log("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", error);
       console.error("Erreur lors de l'appel API :", error.message);
     }
   }

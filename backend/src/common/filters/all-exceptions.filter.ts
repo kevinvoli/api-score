@@ -16,7 +16,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const traceId = request.traceId ?? 'unknown';
+    const traceId = (request as { traceId?: string }).traceId ?? 'unknown';
 
     const status =
       exception instanceof HttpException

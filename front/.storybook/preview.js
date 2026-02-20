@@ -1,5 +1,4 @@
 import '../app/globals.css';
-import { handlers } from '../mocks/handlers';
 
 const preview = {
   parameters: {
@@ -13,9 +12,6 @@ const preview = {
     },
     controls: { expanded: true },
     docs: { theme: undefined }
-  },
-  msw: {
-    handlers
   },
   decorators: [
     (Story) => (
