@@ -341,7 +341,7 @@ export class ApiFootballClient {
           }),
         );
 
-        console.log("tttttttttttttttttttttttttttttttttttttttttt",response);
+
         
         await this.logUsage({
           endpoint: usageEndpoint,

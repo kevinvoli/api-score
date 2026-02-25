@@ -4,18 +4,17 @@ import { usePathname } from 'next/navigation';
 
 const links = [
   { href: '/live', label: 'Live' },
-  { href: '/championnats', label: 'Championnats' },
   { href: '/recommendations', label: 'Recommandations' },
   { href: '/coupons', label: 'Coupons' },
   { href: '/analytics', label: 'Analyse' },
   { href: '/audit', label: 'Audit' },
 ];
 
-export default function SidebarNav() {
+export function NavLinks() {
   const pathname = usePathname();
 
   return (
-    <nav className="sidebar-nav">
+    <nav className="navbar-nav">
       {links.map((link) => {
         const isActive =
           pathname === link.href ||
@@ -23,8 +22,8 @@ export default function SidebarNav() {
         return (
           <a
             key={link.href}
-            className={`sidebar-link${isActive ? ' active' : ''}`}
             href={link.href}
+            className={`navbar-nav-link${isActive ? ' active' : ''}`}
           >
             {link.label}
           </a>

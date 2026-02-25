@@ -1,0 +1,206 @@
+.row {
+  display: grid;
+  grid-template-columns: 72px 1fr auto auto;
+  align-items: center;
+  gap: 0;
+  padding: 0 16px;
+  min-height: 48px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.12s ease;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── Status column ── */
+.statusLive,
+.statusHt,
+.statusFt,
+.statusTime {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.statusLive {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.statusHt {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.statusFt {
+  color: var(--color-text-secondary);
+}
+
+.statusTime {
+  color: var(--color-text-secondary);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-success);
+  flex-shrink: 0;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.dotHt {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-warning);
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ── Match column ── */
+.match {
+  display: grid;
+  grid-template-columns: 1fr 64px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.team {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.teamAway {
+  text-align: left;
+}
+
+.score {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  border-radius: 6px;
+  padding: 2px 6px;
+  transition: background 0.3s;
+}
+
+.scoreFlash {
+  animation: goalFlash 2.5s ease-out forwards;
+}
+
+@keyframes goalFlash {
+  0%   {
+    background: rgba(34, 197, 94, 0.55);
+    color: #fff;
+    transform: scale(1.25);
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.6);
+  }
+  20%  {
+    background: rgba(34, 197, 94, 0.35);
+    transform: scale(1.12);
+  }
+  60%  {
+    background: rgba(34, 197, 94, 0.15);
+    transform: scale(1.02);
+  }
+  100% {
+    background: transparent;
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
+/* ── Odds column ── */
+.odds {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.oddBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: not-allowed;
+  gap: 1px;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.oddBtn:not(:disabled) {
+  cursor: pointer;
+}
+
+.oddBtn:not(:disabled):hover {
+  background: rgba(41, 182, 246, 0.15);
+  border-color: rgba(41, 182, 246, 0.4);
+}
+
+.oddBtn:not(:disabled).selected {
+  background: rgba(41, 182, 246, 0.25);
+  border-color: rgba(41, 182, 246, 0.7);
+}
+
+.oddLabel {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-secondary);
+  line-height: 1;
+}
+
+.oddVal {
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.oddBtn:disabled .oddVal {
+  color: var(--color-text-secondary);
+}
+
+/* ── Analyze button ── */
+.analyzeBtn {
+  font-size: 0.78rem;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.analyzeBtn:hover {
+  color: var(--color-text-primary);
+  border-color: rgba(41, 182, 246, 0.5);
+  background: rgba(41, 182, 246, 0.08);
+}

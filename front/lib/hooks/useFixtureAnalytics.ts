@@ -9,5 +9,5 @@ export const useFixtureAnalytics = (fixtureId: string | undefined) =>
     queryFn: () => fetchFixtureAnalytics(fixtureId ?? ''),
     enabled: Boolean(fixtureId),
     staleTime: 15000,
-    cacheTime: 1000 * 60
+    gcTime: 1000 * 60
   });

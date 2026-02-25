@@ -3,6 +3,7 @@ import {
   fetchProviderCountries,
   fetchProviderLeagues,
   fetchProviderTeams,
+  fetchProviderMatches,
 } from '../api/provider';
 
 export const useProviderCountries = () =>

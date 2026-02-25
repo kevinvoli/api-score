@@ -5,6 +5,7 @@ import { useLiveFixtures } from '../../lib/hooks/useLiveFixtures';
 import { useLiveRecommendations } from '../../lib/hooks/useLiveRecommendations';
 import { useCouponBuilderStore } from '../../lib/state/couponBuilder';
 import { getTeamName } from '../../lib/utils/fixture';
+import { Loader, SkeletonCard } from '../../components/loader/Loader';
 
 export default function RecommendationsPage() {
   const { data: fixturesData } = useLiveFixtures();
@@ -24,7 +25,13 @@ export default function RecommendationsPage() {
       </div>
 
       <div className="rec-list">
-        {isLoading && <p>Chargement des recommandations...</p>}
+        {isLoading && (
+          <>
+            <SkeletonCard rows={3} />
+            <SkeletonCard rows={3} />
+            <SkeletonCard rows={3} />
+          </>
+        )}
         {error && <p>Impossible de charger les recommandations (API).</p>}
         {!isLoading && !recommendations.length && <p>Aucune recommandation disponible.</p>}
         {!isLoading &&

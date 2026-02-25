@@ -1,40 +1,79 @@
 'use client';
 
-import { MatchCardLive } from '../../components/match-card-live/MatchCardLive';
+import { LeagueGroup } from '../../components/league-group/LeagueGroup';
 import { SystemStatusPill } from '../../components/system-status-pill/SystemStatusPill';
+import { SyncButton } from '../../components/sync-button/SyncButton';
+import { Loader, SkeletonList } from '../../components/loader/Loader';
 import { useHealth } from '../../lib/hooks/useHealth';
-import { useLiveFixtures } from '../../lib/hooks/useLiveFixtures';
-import { useFixtureSummary } from '../../lib/hooks/useFixtureSummary';
+import { useLiveFixtures, LIVE_FIXTURES_REFETCH_INTERVAL_MS } from '../../lib/hooks/useLiveFixtures';
+import { useCountdown } from '../../lib/hooks/useCountdown';
+import { useChangedScores } from '../../lib/hooks/useChangedScores';
 import { useUiControlsStore } from '../../lib/state/uiControls';
-import { getTeamName } from '../../lib/utils/fixture';
 import { useMemo, useState } from 'react';
-import { useProviderExplorer } from '../../lib/providerExplorerContext';
-import { useProviderMatches } from '../../lib/hooks/useProviderData';
+import type { LiveFixture } from '../../lib/types/live';
+
+type StatusFilter = 'all' | 'live' | 'upcoming' | 'finished';
+
+const STATUS_GROUPS: Record<Exclude<StatusFilter, 'all'>, Set<string>> = {
+  live:     new Set(['1H', '2H', 'HT', 'ET', 'P', 'BT', 'LIVE', 'INT']),
+  upcoming: new Set(['NS', 'TBD']),
+  finished: new Set(['FT', 'AET', 'PEN', 'AWD', 'WO', 'ABD', 'CANC', 'SUSP', 'PST']),
+};
+
+const FILTER_EMPTY_LABELS: Record<StatusFilter, string> = {
+  all:      'Aucun match disponible.',
+  live:     'Aucun match en direct pour le moment.',
+  upcoming: 'Aucun match à venir dans cette sélection.',
+  finished: 'Aucun match terminé dans cette sélection.',
+};
 
 const heroTitle = 'Un dashboard live pour décider vite';
-const tabs = ['Calendrier', 'Matchs', 'Classement', 'Statistiques'] as const;
-
-type Tab = (typeof tabs)[number];
 
 export default function LivePage() {
-  const [activeTab, setActiveTab] = useState<Tab>(tabs[0]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('live');
   const { data: health } = useHealth();
-  const { data, isLoading, error } = useLiveFixtures();
-  const fixture = data?.items?.[0];
-  const { data: summary } = useFixtureSummary(fixture?.providerFixtureId);
+  const { data, isLoading, isFetching, error, dataUpdatedAt } = useLiveFixtures();
+  const fixtures = data?.items ?? [];
+  const changedScoreIds = useChangedScores(fixtures);
   const { setActiveFixture } = useUiControlsStore();
-  const {
-    selectedCountryId,
-    selectedLeagueId,
-    countries,
-    leagues,
-    countriesLoading,
-    teams,
-    teamsLoading,
-  } = useProviderExplorer();
 
-  const matchesQuery = useProviderMatches(selectedLeagueId ?? undefined);
-  const matches = matchesQuery.data ?? [];
+  const nextRefreshAt = dataUpdatedAt + LIVE_FIXTURES_REFETCH_INTERVAL_MS;
+  const secondsToRefresh = useCountdown(nextRefreshAt);
+
+  const updatedAtLabel = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : null;
+
+  const counts = useMemo<Record<StatusFilter, number>>(() => ({
+    all:      fixtures.length,
+    live:     fixtures.filter((f) => STATUS_GROUPS.live.has(f.statusShort ?? '')).length,
+    upcoming: fixtures.filter((f) => STATUS_GROUPS.upcoming.has(f.statusShort ?? '')).length,
+    finished: fixtures.filter((f) => STATUS_GROUPS.finished.has(f.statusShort ?? '')).length,
+  }), [fixtures]);
+
+  const filteredFixtures = useMemo<LiveFixture[]>(() => {
+    if (statusFilter === 'all') return fixtures;
+    return fixtures.filter((f) => STATUS_GROUPS[statusFilter].has(f.statusShort ?? ''));
+  }, [fixtures, statusFilter]);
+
+  const leagueGroups = useMemo(() => {
+    const map = new Map<number, { leagueName: string; fixtures: LiveFixture[] }>();
+    for (const f of filteredFixtures) {
+      const key = f.leagueId ?? 0;
+      if (!map.has(key)) {
+        map.set(key, {
+          leagueName: f.leagueName ?? `Championnat ${key}`,
+          fixtures: [],
+        });
+      }
+      map.get(key)!.fixtures.push(f);
+    }
+    return [...map.values()].sort((a, b) => b.fixtures.length - a.fixtures.length);
+  }, [filteredFixtures]);
 
   const status =
     health?.status === 'ok' ? 'Healthy' : health?.status === 'degraded' ? 'Degraded' : 'Degraded';
@@ -44,117 +83,6 @@ export default function LivePage() {
       : health?.status === 'degraded'
       ? 'API partiellement disponible'
       : 'API indisponible';
-
-  const selectedCountryName = useMemo(
-    () => countries.find((country) => country.country_id === selectedCountryId)?.country_name,
-    [countries, selectedCountryId],
-  );
-  const selectedLeagueName = useMemo(
-    () => leagues.find((league) => league.league_id === selectedLeagueId)?.league_name,
-    [leagues, selectedLeagueId],
-  );
-
-  const upcomingMatches = useMemo(() => {
-    return [...matches]
-      .sort((a, b) => {
-        const aDate = a.event_date ? new Date(a.event_date).getTime() : Infinity;
-        const bDate = b.event_date ? new Date(b.event_date).getTime() : Infinity;
-        return aDate - bDate;
-      })
-      .slice(0, 5);
-  }, [matches]);
-
-  const renderMatchList = () => {
-    if (!selectedLeagueId) {
-      return <p className="tab-text">Choisis un championnat pour explorer les matchs.</p>;
-    }
-
-    if (matchesQuery.isLoading) {
-      return <p className="tab-text">Chargement des matchs...</p>;
-    }
-
-    if (!matches.length) {
-      return <p className="tab-text">Aucun match trouvé pour cette compétition.</p>;
-    }
-
-    return (
-      <div className="match-list">
-        {matches.map((match) => (
-          <article
-            key={
-              match.fixture_id ??
-              `${match.match_hometeam_name}-${match.match_awayteam_name}-${match.event_date}`
-            }
-            className="match-card"
-          >
-            <div>
-              <strong>
-                {match.match_hometeam_name} vs {match.match_awayteam_name}
-              </strong>
-              <p className="match-meta">
-                {match.event_date
-                  ? new Date(match.event_date).toLocaleString('fr-FR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      day: '2-digit',
-                      month: 'short',
-                    })
-                  : 'Date inconnue'}
-                {match.match_round ? ` · Journée ${match.match_round}` : ''}
-              </p>
-            </div>
-            <span className="match-status">{match.match_status ?? 'Statut inconnu'}</span>
-          </article>
-        ))}
-      </div>
-    );
-  };
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'Calendrier':
-        if (!selectedLeagueId) {
-          return <p className="tab-text">Sélectionne un championnat pour voir le calendrier.</p>;
-        }
-        if (!upcomingMatches.length) {
-          return <p className="tab-text">Aucun match planifié pour ce championnat.</p>;
-        }
-        return (
-          <div className="calendar-grid">
-            {upcomingMatches.map((match) => (
-              <article
-                key={match.fixture_id ?? match.event_date}
-                className="calendar-card"
-              >
-                <p className="eyebrow">Calendrier</p>
-                <strong>
-                  {match.match_hometeam_name} vs {match.match_awayteam_name}
-                </strong>
-                <p className="match-meta">
-                  {match.event_date
-                    ? new Date(match.event_date).toLocaleString('fr-FR', {
-                        day: '2-digit',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : 'Date inconnue'}
-                </p>
-                <span className="match-status">{match.match_status ?? 'Statut inconnu'}</span>
-              </article>
-            ))}
-          </div>
-        );
-      case 'Matchs':
-        return renderMatchList();
-      case 'Classement':
-        return <p className="tab-text">Projection du classement par équipe.</p>;
-      case 'Statistiques':
-        return <p className="tab-text">KPIs dynamiques et mesures avancées.</p>;
-      default:
-        return null;
-    }
-  };
 
   return (
     <section className="content">
@@ -167,80 +95,86 @@ export default function LivePage() {
         <SystemStatusPill status={status} message={statusMessage} />
       </div>
 
-      {isLoading && <p>Chargement des fixtures...</p>}
-      {error && <p>Impossible de charger les données en ce moment.</p>}
-      {fixture ? (
-        <MatchCardLive
-          fixture={{
-            ...fixture,
-            homeTeamName: getTeamName(fixture, 'home'),
-            awayTeamName: getTeamName(fixture, 'away'),
-          }}
-          momentum={
-            summary?.momentum ?? { homePressureIndex: 0, awayPressureIndex: 0, dominantSide: 'balanced' }
-          }
-          confidence={summary?.confidence ?? fixture.confidence ?? 0}
-          dataQualityFlags={summary?.dataQuality?.flags ?? []}
-          riskFlags={fixture.raw?.riskFlags ?? []}
-          onAnalyze={() => setActiveFixture(String(fixture.providerFixtureId))}
-        />
-      ) : (
-        !isLoading && <p>Aucun match live trouvé.</p>
-      )}
+      <div className="live-section">
+        <div className="live-section-header">
+          <div>
+            <p className="eyebrow">En direct</p>
+            <h2 className="live-section-title">
+              Matchs live
+              {filteredFixtures.length > 0 && (
+                <span className="live-count">{filteredFixtures.length}</span>
+              )}
+            </h2>
+          </div>
 
-      <header className="section-header">
-        <div>
-          <p className="eyebrow">Championnat & statistiques</p>
-          <h2>{selectedLeagueName ?? 'Sélectionnez un championnat'}</h2>
-          <p className="lead">
-            {selectedCountryName
-              ? `Pays : ${selectedCountryName}`
-              : countriesLoading
-              ? 'Chargement des pays...'
-              : 'Sélectionne un pays depuis la barre latérale.'}
-          </p>
+          <div className="live-refresh-bar">
+            {isFetching && !isLoading && (
+              <span className="live-spinner" aria-label="Mise à jour en cours" />
+            )}
+            {updatedAtLabel && (
+              <span className="live-updated-at">
+                Mis à jour {updatedAtLabel}
+              </span>
+            )}
+            {!isFetching && dataUpdatedAt > 0 && (
+              <span className="live-countdown">
+                ↻ {secondsToRefresh}s
+              </span>
+            )}
+            <SyncButton />
+          </div>
         </div>
-        <div className="tab-bar">
-          {tabs.map((tab) => (
+
+        <div className="status-filter-bar">
+          {([
+            { id: 'all',      label: 'Tous' },
+            { id: 'live',     label: '● En direct' },
+            { id: 'upcoming', label: 'À venir' },
+            { id: 'finished', label: 'Terminés' },
+          ] as const).map(({ id, label }) => (
             <button
-              key={tab}
-              className={`tab-button${activeTab === tab ? ' active' : ''}`}
+              key={id}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              className={[
+                'status-pill',
+                statusFilter === id ? 'active' : '',
+                id === 'live' ? 'status-pill--live' : '',
+              ].join(' ').trim()}
+              onClick={() => setStatusFilter(id)}
             >
-              {tab}
+              {label}
+              {counts[id] > 0 && (
+                <span className="status-pill-count">{counts[id]}</span>
+              )}
             </button>
           ))}
         </div>
-      </header>
 
-      <div className="tab-content">{renderTabContent()}</div>
+        {isLoading && <SkeletonList count={6} />}
+        {error && <p className="tab-text">Impossible de charger les données.</p>}
 
-      <div className="team-list">
-        <div className="team-list-header">
-          <div>
-            <p className="eyebrow">Équipes</p>
-            <strong>{selectedLeagueName ?? 'Choisis un championnat'}</strong>
+        {!isLoading && !error && filteredFixtures.length === 0 && (
+          <div className="live-empty">
+            <p>{FILTER_EMPTY_LABELS[statusFilter]}</p>
+            {statusFilter === 'live' && (
+              <small>Lance une synchronisation ou attends le prochain refresh automatique.</small>
+            )}
           </div>
-          <span className="team-list-meta">
-            {teams.length ? `${teams.length} équipes` : 'Aucune équipe'}
-          </span>
-        </div>
-        <div className="team-grid">
-          {teamsLoading && selectedLeagueId && <p>Chargement des équipes...</p>}
-          {!teamsLoading && teams.length === 0 && selectedLeagueId && (
-            <p className="tab-text">Aucune équipe disponible pour ce championnat.</p>
-          )}
-          {teams.map((team) => (
-            <div key={team.team_key} className="team-card">
-              {team.team_logo && <img src={team.team_logo} alt="" className="team-logo" />}
-              <div>
-                <p>{team.team_name}</p>
-                <small>{team.country ?? 'Pays inconnu'}</small>
-              </div>
-            </div>
-          ))}
-        </div>
+        )}
+
+        {leagueGroups.length > 0 && (
+          <div className="live-groups">
+            {leagueGroups.map((group) => (
+              <LeagueGroup
+                key={group.leagueName}
+                leagueName={group.leagueName}
+                fixtures={group.fixtures}
+                onAnalyze={setActiveFixture}
+                changedScoreIds={changedScoreIds}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

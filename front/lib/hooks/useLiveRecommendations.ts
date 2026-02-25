@@ -10,5 +10,5 @@ export const useLiveRecommendations = (
     queryKey: ['live-recommendations', params],
     queryFn: () => fetchLiveRecommendations(params),
     staleTime: 15000,
-    cacheTime: 1000 * 60
+    gcTime: 1000 * 60
   });

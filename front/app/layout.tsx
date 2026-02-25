@@ -1,7 +1,10 @@
 import './globals.css';
 import { ReactNode } from 'react';
 import Providers from './providers';
-import SidebarNav from './SidebarNav';
+import { NavLinks } from '../components/nav-links/NavLinks';
+import { SidebarChampions } from '../components/sidebar-champions/SidebarChampions';
+import { CouponPanel } from '../components/coupon-panel/CouponPanel';
+import { FixtureDetailPanel } from '../components/fixture-detail-panel/FixtureDetailPanel';
 
 export const metadata = {
   title: 'API SCORE | Command Center',
@@ -16,29 +19,23 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <div className="app-shell">
             <aside className="sidebar">
               <div className="sidebar-brand">API SCORE</div>
-              <SidebarNav />
+              <SidebarChampions />
               <div className="sidebar-footer">v0.1 Command Center</div>
             </aside>
 
             <div className="app-body">
               <header className="navbar">
-                <div>
-                  <span className="navbar-title">Centre de Commande</span>
-                  <span className="navbar-sub">OpÃ©rations live</span>
-                </div>
-                <div className="navbar-actions">
-                  <button className="navbar-btn" type="button">
-                    Exporter
-                  </button>
-                  <button className="navbar-btn primary" type="button">
-                    Synchroniser
-                  </button>
-                </div>
+                <NavLinks />
               </header>
 
               <main className="page">{children}</main>
             </div>
+
+            <aside className="right-panel">
+              <CouponPanel />
+            </aside>
           </div>
+          <FixtureDetailPanel />
         </Providers>
       </body>
     </html>
