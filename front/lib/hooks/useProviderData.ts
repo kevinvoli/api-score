@@ -4,6 +4,7 @@ import {
   fetchProviderLeagues,
   fetchProviderTeams,
   fetchProviderMatches,
+  fetchProviderStandings,
 } from '../api/provider';
 
 export const useProviderCountries = () =>
@@ -34,4 +35,12 @@ export const useProviderMatches = (leagueId?: number) =>
     queryFn: () => (leagueId ? fetchProviderMatches(leagueId) : Promise.resolve([])),
     enabled: Boolean(leagueId),
     staleTime: 1000 * 60 * 3,
+  });
+
+export const useProviderStandings = (leagueId?: number) =>
+  useQuery({
+    queryKey: ['provider', 'standings', leagueId ?? 'none'],
+    queryFn: () => (leagueId ? fetchProviderStandings(leagueId) : Promise.resolve([])),
+    enabled: Boolean(leagueId),
+    staleTime: 1000 * 60 * 5,
   });

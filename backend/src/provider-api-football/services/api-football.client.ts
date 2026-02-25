@@ -208,6 +208,24 @@ export class ApiFootballClient {
     return Array.isArray(data) ? data : [];
   }
 
+  async fetchStandings(leagueId: number): Promise<any[]> {
+    if (this.provider === 'apifootball') {
+      const data = await this.getApifootball(
+        'get_standings',
+        { league_id: leagueId },
+        'standings',
+      );
+      return Array.isArray(data) ? data : [];
+    }
+
+    const data = await this.getApiSports(
+      '/standings',
+      { league: leagueId },
+      'standings',
+    );
+    return Array.isArray(data) ? data : [];
+  }
+
   async fetchLeagueFixtures(leagueId: number): Promise<any[]> {
     if (this.provider === 'apifootball') {
       const data = await this.getApifootball(

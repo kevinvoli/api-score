@@ -14,6 +14,7 @@ import { Team } from './entities/team.entity';
 import { Country } from './entities/country.entity';
 import { League } from './entities/league.entity';
 import { Match } from './entities/match.entity';
+import { Standing } from './entities/standing.entity';
 
 const dbUrl = process.env.DB_URL;
 if (!dbUrl) {
@@ -40,6 +41,7 @@ export default new DataSource({
     Country,
     League,
     Match,
+    Standing,
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false,

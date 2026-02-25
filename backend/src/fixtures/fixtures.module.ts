@@ -11,6 +11,7 @@ import { Team } from '../database/entities/team.entity';
 import { Country } from '../database/entities/country.entity';
 import { League } from '../database/entities/league.entity';
 import { Match } from '../database/entities/match.entity';
+import { Standing } from '../database/entities/standing.entity';
 import { ProviderApiFootballModule } from '../provider-api-football/provider-api-football.module';
 import { FixturesController } from './fixtures.controller';
 import { FixturesIngestionService } from './fixtures-ingestion.service';
@@ -33,6 +34,7 @@ import { ProviderPersistenceService } from './provider-persistence.service';
       Team,
       Country,
       League,
+      Standing,
     ]),
   ],
   controllers: [FixturesController, ProviderController],

@@ -1,11 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useProviderExplorer } from '../../lib/providerExplorerContext';
-import { useProviderMatches } from '../../lib/hooks/useProviderData';
-import { Loader, SkeletonList, SkeletonGrid } from '../../components/loader/Loader';
+import { useProviderMatches, useProviderStandings } from '../../lib/hooks/useProviderData';
+import { Loader, SkeletonList } from '../../components/loader/Loader';
+
+type Tab = 'matches' | 'standings' | 'teams';
 
 export default function ChampionnatsPage() {
+  const [activeTab, setActiveTab] = useState<Tab>('matches');
+
   const {
     selectedCountryId,
     selectedLeagueId,
@@ -20,7 +24,9 @@ export default function ChampionnatsPage() {
   } = useProviderExplorer();
 
   const matchesQuery = useProviderMatches(selectedLeagueId ?? undefined);
+  const standingsQuery = useProviderStandings(selectedLeagueId ?? undefined);
   const matches = matchesQuery.data ?? [];
+  const standings = standingsQuery.data ?? [];
 
   const selectedCountry = useMemo(
     () => countries.find((c) => c.country_id === selectedCountryId),
@@ -41,172 +47,263 @@ export default function ChampionnatsPage() {
     [matches],
   );
 
+  const groupedMatches = useMemo(() => {
+    const groups: Record<string, typeof sortedMatches> = {};
+    for (const m of sortedMatches) {
+      const key = m.match_date ?? (m.event_date ? new Date(m.event_date).toLocaleDateString('fr-FR') : 'Date inconnue');
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(m);
+    }
+    return groups;
+  }, [sortedMatches]);
+
   return (
     <section className="content">
       <div className="hero">
         <p className="eyebrow">Championnats</p>
         <h1>Explorer les compétitions</h1>
-        <p className="lead">
-          Navigue dans la hiérarchie Pays → Championnat → Matchs pour explorer les données.
-        </p>
+        <p className="lead">Sélectionne un pays et un championnat pour explorer les données.</p>
       </div>
 
-      {/* ── Explorateur hiérarchique 3 colonnes ── */}
-      <div className="hier-explorer">
-
-        {/* Colonne 1 : Pays */}
-        <div className="hier-col">
-          <div className="hier-col-header">
-            <p className="eyebrow">Pays</p>
-            {selectedCountry && (
-              <span className="hier-breadcrumb">{selectedCountry.country_name}</span>
-            )}
-          </div>
-          <div className="hier-col-body">
-            {countriesLoading && <Loader size={20} centered />}
-            {!countriesLoading && !countries.length && (
-              <p className="hier-empty">Aucun pays disponible.</p>
-            )}
-            {countries.map((country) => (
-              <button
-                key={country.country_id}
-                type="button"
-                className={`hier-item${selectedCountryId === country.country_id ? ' active' : ''}`}
-                onClick={() => setSelectedCountryId(country.country_id)}
-              >
-                {country.country_logo && (
-                  <img src={country.country_logo} alt="" className="hier-flag" />
-                )}
-                <span className="hier-item-label">{country.country_name}</span>
-                {selectedCountryId === country.country_id && (
-                  <span className="hier-arrow">›</span>
-                )}
-              </button>
-            ))}
-          </div>
+      {/* ── Sélecteurs ── */}
+      <div className="champ-selectors">
+        <div className="champ-select-group">
+          <label className="champ-select-label" htmlFor="sel-country">Pays</label>
+          {countriesLoading ? (
+            <Loader size={18} centered />
+          ) : (
+            <select
+              id="sel-country"
+              className="champ-select"
+              value={selectedCountryId ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSelectedCountryId(v ? Number(v) : null);
+                setSelectedLeagueId(null);
+                setActiveTab('matches');
+              }}
+            >
+              <option value="">— Choisir un pays —</option>
+              {countries.map((c) => (
+                <option key={c.country_id} value={c.country_id}>
+                  {c.country_name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {/* Colonne 2 : Championnats */}
-        <div className="hier-col">
-          <div className="hier-col-header">
-            <p className="eyebrow">Championnats</p>
-            {selectedLeague && (
-              <span className="hier-breadcrumb">{selectedLeague.league_name}</span>
-            )}
-          </div>
-          <div className="hier-col-body">
-            {!selectedCountryId && (
-              <p className="hier-empty">← Sélectionne un pays</p>
-            )}
-            {selectedCountryId && leaguesLoading && <Loader size={20} centered />}
-            {selectedCountryId && !leaguesLoading && !leagues.length && (
-              <p className="hier-empty">Aucun championnat pour ce pays.</p>
-            )}
-            {leagues.map((league) => (
-              <button
-                key={league.league_id}
-                type="button"
-                className={`hier-item${selectedLeagueId === league.league_id ? ' active' : ''}`}
-                onClick={() => setSelectedLeagueId(league.league_id)}
-              >
-                <span className="hier-item-label">{league.league_name}</span>
-                {league.season && (
-                  <small className="hier-item-meta">{league.season}</small>
-                )}
-                {selectedLeagueId === league.league_id && (
-                  <span className="hier-arrow">›</span>
-                )}
-              </button>
-            ))}
-          </div>
+        <div className="champ-select-group">
+          <label className="champ-select-label" htmlFor="sel-league">Championnat</label>
+          {leaguesLoading ? (
+            <Loader size={18} centered />
+          ) : (
+            <select
+              id="sel-league"
+              className="champ-select"
+              value={selectedLeagueId ?? ''}
+              disabled={!selectedCountryId}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSelectedLeagueId(v ? Number(v) : null);
+                setActiveTab('matches');
+              }}
+            >
+              <option value="">— Choisir un championnat —</option>
+              {leagues.map((l) => (
+                <option key={l.league_id} value={l.league_id}>
+                  {l.league_name}{l.season ? ` · ${l.season}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {/* Colonne 3 : Matchs */}
-        <div className="hier-col hier-col--wide">
-          <div className="hier-col-header">
-            <p className="eyebrow">Matchs</p>
-            {sortedMatches.length > 0 && (
-              <span className="hier-breadcrumb">{sortedMatches.length} matchs</span>
+        {/* Info sélection */}
+        {selectedLeague && (
+          <div className="champ-sel-info">
+            {selectedLeague.league_logo && (
+              <img src={selectedLeague.league_logo} alt="" className="champ-league-logo" />
             )}
-          </div>
-          <div className="hier-col-body">
-            {!selectedLeagueId && (
-              <p className="hier-empty">← Sélectionne un championnat</p>
-            )}
-            {selectedLeagueId && matchesQuery.isLoading && <SkeletonList count={6} />}
-            {selectedLeagueId && !matchesQuery.isLoading && !matches.length && (
-              <p className="hier-empty">Aucun match trouvé.</p>
-            )}
-            {sortedMatches.map((match) => (
-              <div
-                key={
-                  match.fixture_id ??
-                  `${match.match_hometeam_name}-${match.match_awayteam_name}-${match.event_date}`
-                }
-                className="hier-match-row"
-              >
-                <div className="hier-match-teams">
-                  <span className="hier-match-team">{match.match_hometeam_name ?? '—'}</span>
-                  <span className="hier-match-vs">vs</span>
-                  <span className="hier-match-team hier-match-team--away">
-                    {match.match_awayteam_name ?? '—'}
-                  </span>
-                </div>
-                <div className="hier-match-meta">
-                  {match.event_date
-                    ? new Date(match.event_date).toLocaleString('fr-FR', {
-                        day: '2-digit',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : 'Date inconnue'}
-                  {match.match_round ? ` · J${match.match_round}` : ''}
-                </div>
-                {match.match_status && (
-                  <span className="hier-match-status">{match.match_status}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Équipes du championnat sélectionné ── */}
-      {selectedLeagueId && (
-        <div className="team-list">
-          <div className="team-list-header">
             <div>
-              <p className="eyebrow">Équipes</p>
-              <strong>{selectedLeague?.league_name ?? '—'}</strong>
+              <strong>{selectedLeague.league_name}</strong>
+              {selectedLeague.season && <small className="champ-sel-season">{selectedLeague.season}</small>}
               {selectedCountry && (
-                <small style={{ marginLeft: 8, color: 'var(--color-text-secondary)' }}>
-                  {selectedCountry.country_name}
-                </small>
+                <small className="champ-sel-country">{selectedCountry.country_name}</small>
               )}
             </div>
-            <span className="team-list-meta">
-              {teamsLoading ? '...' : `${teams.length} équipe${teams.length !== 1 ? 's' : ''}`}
-            </span>
           </div>
-          <div className="team-grid">
-            {teamsLoading && <SkeletonGrid count={8} />}
-            {!teamsLoading && teams.length === 0 && (
-              <p className="tab-text">Aucune équipe disponible pour ce championnat.</p>
-            )}
-            {teams.map((team) => (
-              <div key={team.team_key} className="team-card">
-                {team.team_logo && (
-                  <img src={team.team_logo} alt="" className="team-logo" />
-                )}
-                <div>
-                  <p>{team.team_name}</p>
-                  <small>{team.country ?? selectedCountry?.country_name ?? 'Pays inconnu'}</small>
-                </div>
-              </div>
+        )}
+      </div>
+
+      {/* ── Tabs ── */}
+      {selectedLeagueId && (
+        <>
+          <div className="champ-tabs">
+            {(['matches', 'standings', 'teams'] as Tab[]).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                className={`champ-tab${activeTab === tab ? ' active' : ''}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab === 'matches'
+                  ? `Matchs${matches.length ? ` (${matches.length})` : ''}`
+                  : tab === 'standings'
+                  ? `Classement${standings.length ? ` (${standings.length})` : ''}`
+                  : `Équipes${teams.length ? ` (${teams.length})` : ''}`}
+              </button>
             ))}
           </div>
-        </div>
+
+          {/* ── TAB: Matchs ── */}
+          {activeTab === 'matches' && (
+            <div className="champ-tab-body">
+              {matchesQuery.isLoading && <SkeletonList count={8} />}
+              {!matchesQuery.isLoading && !matches.length && (
+                <p className="champ-empty">Aucun match trouvé pour ce championnat.</p>
+              )}
+              {!matchesQuery.isLoading && Object.entries(groupedMatches).map(([date, dayMatches]) => (
+                <div key={date} className="champ-day-group">
+                  <p className="champ-day-label">{date}</p>
+                  {dayMatches.map((match) => {
+                    const id = match.fixture_id ?? match.match_id ?? `${match.match_hometeam_name}-${match.match_awayteam_name}`;
+                    const score = match.match_hometeam_score != null && match.match_awayteam_score != null
+                      ? `${match.match_hometeam_score} - ${match.match_awayteam_score}`
+                      : null;
+                    return (
+                      <div key={id} className="champ-match-row">
+                        <div className="champ-match-time">
+                          {match.match_time ?? (match.event_date
+                            ? new Date(match.event_date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                            : '—')}
+                        </div>
+
+                        <div className="champ-match-teams">
+                          <div className="champ-team home">
+                            {match.team_home_badge && (
+                              <img src={match.team_home_badge} alt="" className="champ-badge" />
+                            )}
+                            <span>{match.match_hometeam_name ?? '—'}</span>
+                          </div>
+
+                          <div className="champ-score-block">
+                            {score ? (
+                              <span className="champ-score">{score}</span>
+                            ) : (
+                              <span className="champ-score-sep">vs</span>
+                            )}
+                            {match.match_live == 1 || match.match_live === '1' ? (
+                              <span className="champ-live-dot">EN DIRECT</span>
+                            ) : null}
+                          </div>
+
+                          <div className="champ-team away">
+                            <span>{match.match_awayteam_name ?? '—'}</span>
+                            {match.team_away_badge && (
+                              <img src={match.team_away_badge} alt="" className="champ-badge" />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="champ-match-meta">
+                          {match.match_round ? <span>J{match.match_round}</span> : null}
+                          {match.match_status ? <span className="champ-status">{match.match_status}</span> : null}
+                          {match.match_stadium ? <span className="champ-stadium">{match.match_stadium}</span> : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── TAB: Classement ── */}
+          {activeTab === 'standings' && (
+            <div className="champ-tab-body">
+              {standingsQuery.isLoading && <SkeletonList count={10} />}
+              {!standingsQuery.isLoading && !standings.length && (
+                <p className="champ-empty">Classement non disponible pour ce championnat.</p>
+              )}
+              {!standingsQuery.isLoading && standings.length > 0 && (
+                <div className="champ-standings">
+                  <div className="champ-standings-header">
+                    <span className="col-rank">#</span>
+                    <span className="col-team">Équipe</span>
+                    <span className="col-num">J</span>
+                    <span className="col-num">V</span>
+                    <span className="col-num">N</span>
+                    <span className="col-num">D</span>
+                    <span className="col-num">BP</span>
+                    <span className="col-num">BC</span>
+                    <span className="col-num">Diff</span>
+                    <span className="col-pts">Pts</span>
+                  </div>
+                  {standings.map((s) => (
+                    <div
+                      key={s.teamKey}
+                      className={`champ-standing-row${s.standingPlaceType ? ' has-badge' : ''}`}
+                    >
+                      <span className="col-rank">{s.standingPlace}</span>
+                      <span className="col-team">
+                        {s.teamBadge && <img src={s.teamBadge} alt="" className="champ-badge champ-badge--sm" />}
+                        <span className="champ-team-name">{s.teamName}</span>
+                        {s.standingPlaceType && (
+                          <span className="champ-place-type">{s.standingPlaceType}</span>
+                        )}
+                      </span>
+                      <span className="col-num">{s.played}</span>
+                      <span className="col-num">{s.won}</span>
+                      <span className="col-num">{s.drawn}</span>
+                      <span className="col-num">{s.lost}</span>
+                      <span className="col-num">{s.goalsFor}</span>
+                      <span className="col-num">{s.goalsAgainst}</span>
+                      <span className={`col-num ${s.goalDiff > 0 ? 'pos' : s.goalDiff < 0 ? 'neg' : ''}`}>
+                        {s.goalDiff > 0 ? `+${s.goalDiff}` : s.goalDiff}
+                      </span>
+                      <span className="col-pts">{s.points}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TAB: Équipes ── */}
+          {activeTab === 'teams' && (
+            <div className="champ-tab-body">
+              {teamsLoading && <SkeletonList count={6} />}
+              {!teamsLoading && teams.length === 0 && (
+                <p className="champ-empty">Aucune équipe disponible pour ce championnat.</p>
+              )}
+              <div className="team-grid">
+                {teams.map((team) => (
+                  <div key={team.team_key} className="team-card">
+                    {team.team_logo && (
+                      <img src={team.team_logo} alt="" className="team-logo" />
+                    )}
+                    <div>
+                      <p>{team.team_name}</p>
+                      <small>{team.country ?? selectedCountry?.country_name ?? 'Pays inconnu'}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {!selectedLeagueId && !selectedCountryId && (
+        <p className="champ-empty champ-empty--center">
+          Sélectionne un pays pour commencer.
+        </p>
+      )}
+      {!selectedLeagueId && selectedCountryId && !leaguesLoading && (
+        <p className="champ-empty champ-empty--center">
+          Sélectionne un championnat pour voir les données.
+        </p>
       )}
     </section>
   );

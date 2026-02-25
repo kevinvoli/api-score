@@ -5,7 +5,7 @@ import { useProviderCountries, useProviderLeagues, useProviderTeams } from './ho
 
 type ProviderExplorerValue = {
   countries: Array<{ country_id: number; country_name: string; country_logo?: string }>;
-  leagues: Array<{ league_id: number; league_name: string; country_id?: number; season?: number }>;
+  leagues: Array<{ league_id: number; league_name: string; country_id?: number; season?: string; league_logo?: string; country_name?: string }>;
   teams: Array<{ team_key: number; team_name: string; country?: string; team_logo?: string }>;
   selectedCountryId: number | null;
   selectedLeagueId: number | null;

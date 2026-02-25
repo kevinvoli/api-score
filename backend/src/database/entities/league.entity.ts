@@ -15,8 +15,14 @@ export class League {
   @Column({ type: 'int', nullable: true })
   countryId: number | null;
 
-  @Column({ type: 'int', nullable: true })
-  season: number | null;
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  season: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  logo: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  countryName: string | null;
 
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
