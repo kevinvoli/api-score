@@ -180,6 +180,48 @@ export class ApiFootballClient {
     return Array.isArray(data) ? data : [];
   }
 
+  async fetchCountries(): Promise<any[]> {
+    if (this.provider === 'apifootball') {
+      const data = await this.getApifootball('get_countries', {}, 'countries');
+      return Array.isArray(data) ? data : [];
+    }
+
+    const data = await this.getApiSports('/countries', {}, 'countries');
+    return Array.isArray(data) ? data : [];
+  }
+
+  async fetchLeagues(countryId?: number): Promise<any[]> {
+    if (this.provider === 'apifootball') {
+      const params: QueryParams = {};
+      if (countryId !== undefined && countryId !== null) {
+        params.country_id = countryId;
+      }
+      const data = await this.getApifootball('get_leagues', params, 'leagues');
+      return Array.isArray(data) ? data : [];
+    }
+
+    const params: QueryParams = {};
+    if (countryId !== undefined && countryId !== null) {
+      params.country = countryId;
+    }
+    const data = await this.getApiSports('/leagues', params, 'leagues');
+    return Array.isArray(data) ? data : [];
+  }
+
+  async fetchLeagueFixtures(leagueId: number): Promise<any[]> {
+    if (this.provider === 'apifootball') {
+      const data = await this.getApifootball(
+        'get_events',
+        { league_id: leagueId },
+        'league_fixtures',
+      );
+      return Array.isArray(data) ? data : [];
+    }
+
+    const data = await this.getApiSports('/fixtures', { league: leagueId }, 'league_fixtures');
+    return Array.isArray(data) ? data : [];
+  }
+
   async fetchTeamById(teamId: number): Promise<any | null> {
     if (this.provider === 'apifootball') {
       const data = await this.getApifootball(
