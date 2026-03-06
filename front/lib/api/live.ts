@@ -39,3 +39,31 @@ export type SyncResult = {
 
 export const syncLiveFixtures = (): Promise<SyncResult> =>
   apiFetch<SyncResult>('/v1/live/fixtures/sync', { method: 'POST' });
+
+export type SmartCoupon = {
+  id: string;
+  fixtureId: string;
+  homeTeamName: string | null;
+  awayTeamName: string | null;
+  teamId: number | null;
+  teamName: string | null;
+  isHomeTeam: boolean;
+  marketType: string;
+  selection: string;
+  currentOdd: number | null;
+  minAcceptableOdd: number | null;
+  edgePct: number | null;
+  confidenceScore: number | null;
+  reasons: string[] | null;
+  ruleName: string | null;
+  elapsedAtSuggestion: number | null;
+  shotsCount: number | null;
+  status: 'PENDING' | 'WON' | 'LOST';
+  resolvedAt: string | null;
+  createdAt: string;
+};
+
+export const fetchCouponHistory = (limit = 50, offset = 0): Promise<{ data: SmartCoupon[]; total: number }> =>
+  apiFetch<{ data: SmartCoupon[]; total: number }>(
+    `/v1/live/recommendations/coupons?limit=${limit}&offset=${offset}`,
+  );

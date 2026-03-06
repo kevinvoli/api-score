@@ -11,6 +11,7 @@ import { FixturesModule } from './fixtures/fixtures.module';
 import { MatchModule } from './match/match.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { SettingsModule } from './settings/settings.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { ArchiveModule } from './archive/archive.module';
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -26,6 +27,7 @@ import { TeamsModule } from './teams/teams.module';
     MatchModule,
     MonitoringModule,
     RecommendationsModule,
+    SettingsModule,
     MaintenanceModule,
     ArchiveModule,
     AnalyticsModule,

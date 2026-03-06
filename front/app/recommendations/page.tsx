@@ -18,9 +18,9 @@ export default function RecommendationsPage() {
     <section className="recommendations">
       <div className="hero">
         <p className="eyebrow">Recommandations</p>
-        <h1>PrioritÃ© du moment</h1>
+        <h1>Priorité du moment</h1>
         <p className="lead">
-          DÃ©couvrez les recommandations live les plus intÃ©ressantes et ajoutez-les directement dans votre coupon.
+          Découvrez les recommandations live les plus intéressantes et ajoutez-les directement dans votre coupon.
         </p>
       </div>
 

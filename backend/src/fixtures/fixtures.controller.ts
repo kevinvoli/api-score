@@ -2,14 +2,21 @@ import { Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/commo
 import { GetFixturesHistoryQueryDto } from './dto/get-fixtures-history-query.dto';
 import { GetLiveFixturesQueryDto } from './dto/get-live-fixtures-query.dto';
 import { FixturesIngestionService } from './fixtures-ingestion.service';
+import { SmartSuggestionsService } from '../recommendations/smart-suggestions.service';
 
 @Controller('live/fixtures')
 export class FixturesController {
-  constructor(private readonly fixturesIngestionService: FixturesIngestionService) {}
+  constructor(
+    private readonly fixturesIngestionService: FixturesIngestionService,
+    private readonly smartSuggestionsService: SmartSuggestionsService,
+  ) {}
 
   @Post('sync')
-  syncLiveFixtures() {
-    return this.fixturesIngestionService.syncLiveFixtures();
+  async syncLiveFixtures() {
+    const result = await this.fixturesIngestionService.syncLiveFixtures();
+    // Re-evaluate smart suggestions after each manual sync
+    await this.smartSuggestionsService.evaluateAndSave().catch(() => undefined);
+    return result;
   }
 
   @Get()

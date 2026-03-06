@@ -19,6 +19,8 @@ export function SyncButton() {
       setLastResult(result);
       setPhase('success');
       queryClient.invalidateQueries({ queryKey: ['live-fixtures'] });
+      queryClient.invalidateQueries({ queryKey: ['smart-suggestions'] });
+      queryClient.invalidateQueries({ queryKey: ['coupon-history'] });
       scheduleRevert();
     },
     onError: () => {

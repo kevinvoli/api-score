@@ -10,6 +10,7 @@ import { FixturePlayerStatsSnapshot } from './entities/fixture-player-stats-snap
 import { FixtureStatsSnapshot } from './entities/fixture-stats-snapshot.entity';
 import { Fixture } from './entities/fixture.entity';
 import { BetRecommendation } from './entities/bet-recommendation.entity';
+import { SmartCoupon } from './entities/smart-coupon.entity';
 import { Team } from './entities/team.entity';
 import { Country } from './entities/country.entity';
 import { League } from './entities/league.entity';
@@ -32,6 +33,7 @@ export default new DataSource({
     AppRuntimeState,
     FixtureAnalytics,
     BetRecommendation,
+    SmartCoupon,
     Team,
     Fixture,
     FixtureEvent,

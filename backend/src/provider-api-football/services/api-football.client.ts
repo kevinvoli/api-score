@@ -268,6 +268,87 @@ export class ApiFootballClient {
     };
   }
 
+  /**
+   * Récupère les cotes live + commentaires pour un match donné (apifootball uniquement).
+   * Retourne null si le provider n'est pas apifootball ou en cas d'erreur.
+   */
+  async fetchLiveOddsForMatch(matchId: number): Promise<{
+    ou05Over: number | null;
+    ou05Under: number | null;
+  } | null> {
+    if (this.provider !== 'apifootball') return null;
+    try {
+      const data = await this.getApifootball(
+        'get_live_odds_commnets',
+        { match_id: matchId },
+        'live_odds',
+      );
+      return this.extractOU05Odds(data);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Récupère toutes les cotes O/U live (sans filtre match).
+   * Retourne une Map : providerMatchId → { ou05Over, ou05Under }
+   */
+  async fetchAllLiveOdds(): Promise<Map<number, { ou05Over: number | null; ou05Under: number | null }>> {
+    if (this.provider !== 'apifootball') return new Map();
+    try {
+      const data = await this.getApifootball('get_live_odds_commnets', {}, 'live_odds_all');
+      const result = new Map<number, { ou05Over: number | null; ou05Under: number | null }>();
+      if (!Array.isArray(data)) return result;
+      for (const entry of data as Record<string, unknown>[]) {
+        const id = this.toNumber(entry.match_id);
+        if (id === null) continue;
+        const odds = this.extractOU05Odds(entry);
+        if (odds) result.set(id, odds);
+      }
+      return result;
+    } catch {
+      return new Map();
+    }
+  }
+
+  /**
+   * Extrait les cotes Over/Under 0.5 buts depuis un objet de réponse apifootball.
+   * Tente plusieurs formats connus.
+   */
+  private extractOU05Odds(entry: unknown): { ou05Over: number | null; ou05Under: number | null } | null {
+    if (!entry || typeof entry !== 'object') return null;
+    const obj = entry as Record<string, unknown>;
+
+    // Format 1 : tableau bets[].values[]
+    const bets = obj['bets'];
+    if (Array.isArray(bets)) {
+      for (const bet of bets as Record<string, unknown>[]) {
+        const name = String(bet['name'] ?? '').toLowerCase();
+        if (!name.includes('over') || !name.includes('under')) continue;
+        const values = bet['values'];
+        if (!Array.isArray(values)) continue;
+        let over: number | null = null;
+        let under: number | null = null;
+        for (const v of values as Record<string, unknown>[]) {
+          const label = String(v['value'] ?? '').toLowerCase();
+          const n = this.toNumber(v['odd'] ?? v['value2']);
+          if (label.includes('over 0.5') || label === 'over') over = n;
+          if (label.includes('under 0.5') || label === 'under') under = n;
+        }
+        if (over !== null || under !== null) return { ou05Over: over, ou05Under: under };
+      }
+    }
+
+    // Format 2 : champs plats over / under
+    const overFlat = this.toNumber(obj['over_0_5'] ?? obj['over05'] ?? obj['over']);
+    const underFlat = this.toNumber(obj['under_0_5'] ?? obj['under05'] ?? obj['under']);
+    if (overFlat !== null || underFlat !== null) {
+      return { ou05Over: overFlat, ou05Under: underFlat };
+    }
+
+    return null;
+  }
+
   async fetchTeamById(teamId: number): Promise<any | null> {
     if (this.provider === 'apifootball') {
       const data = await this.getApifootball(
