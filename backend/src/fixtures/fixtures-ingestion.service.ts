@@ -788,7 +788,7 @@ export class FixturesIngestionService {
         payload?.teams?.away?.logo ??
         payload?.team_away_badge ??
         null,
-      statusShort: apiSportsFixture?.status?.short ?? payload?.match_status ?? null,
+      statusShort: apiSportsFixture?.status?.short ?? this.normalizeApifootballStatus(payload?.match_status),
       statusLong: apiSportsFixture?.status?.long ?? payload?.match_status ?? null,
       elapsed: apiSportsFixture?.status?.elapsed ?? this.toNumber(payload?.match_status) ?? null,
       matchDate: apiSportsFixture?.date ? new Date(apiSportsFixture.date) : this.toDate(payload?.match_date),
@@ -819,6 +819,29 @@ export class FixturesIngestionService {
 
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  /**
+   * Normalise le champ match_status d'apifootball.com en code api-sports standard.
+   * - ""          → "NS"   (Not Started)
+   * - "75" etc.   → "LIVE" (en cours, la valeur numérique = minutes écoulées)
+   * - "HT","FT","AET","ET","P","1H","2H" → inchangés (déjà compatibles)
+   * - "Cancelled" → "CANC", "Postponed" → "PST", etc.
+   */
+  private normalizeApifootballStatus(raw: string | null | undefined): string | null {
+    if (raw === null || raw === undefined) return null;
+    if (raw === '') return 'NS';
+    if (/^\d+(\+\d+)?$/.test(raw)) return 'LIVE'; // "75", "45+2", etc.
+    const MAP: Record<string, string> = {
+      Cancelled:      'CANC',
+      Postponed:      'PST',
+      Interrupted:    'INT',
+      Abandoned:      'ABD',
+      Awarded:        'AWD',
+      Suspended:      'SUSP',
+      'Not Coverage': 'NS',
+    };
+    return MAP[raw] ?? raw;
   }
 
   private keepLatestSnapshotRows<T extends { snapshotAt: Date }>(rows: T[]): T[] {

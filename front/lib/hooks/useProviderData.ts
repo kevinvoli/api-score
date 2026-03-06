@@ -30,12 +30,12 @@ export const useProviderTeams = (leagueId?: number) =>
     staleTime: 1000 * 60 * 5,
   });
 
-export const useProviderMatches = (leagueId?: number) =>
+export const useProviderMatches = (leagueId?: number, from?: string, to?: string) =>
   useQuery({
-    queryKey: ['provider', 'matches', leagueId ?? 'none'],
-    queryFn: () => (leagueId ? fetchProviderMatches(leagueId) : Promise.resolve([])),
+    queryKey: ['provider', 'matches', leagueId ?? 'none', from, to],
+    queryFn: () => (leagueId ? fetchProviderMatches(leagueId, from, to) : Promise.resolve([])),
     enabled: Boolean(leagueId),
-    staleTime: 1000 * 60 * 3,
+    staleTime: 1000 * 60 * 5,
   });
 
 export const useProviderStandings = (leagueId?: number) =>

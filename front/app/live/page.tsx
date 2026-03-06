@@ -14,11 +14,20 @@ import type { LiveFixture } from '../../lib/types/live';
 
 type StatusFilter = 'all' | 'live' | 'upcoming' | 'finished';
 
+// statusShort normalisés (api-sports) + anciens formats apifootball bruts encore en cache
 const STATUS_GROUPS: Record<Exclude<StatusFilter, 'all'>, Set<string>> = {
   live:     new Set(['1H', '2H', 'HT', 'ET', 'P', 'BT', 'LIVE', 'INT']),
-  upcoming: new Set(['NS', 'TBD']),
-  finished: new Set(['FT', 'AET', 'PEN', 'AWD', 'WO', 'ABD', 'CANC', 'SUSP', 'PST']),
+  upcoming: new Set(['NS', 'TBD', '']),  // '' = apifootball "Not Started" non normalisé
+  finished: new Set(['FT', 'AET', 'PEN', 'AWD', 'WO', 'ABD', 'CANC', 'SUSP', 'PST',
+                     'Cancelled', 'Postponed', 'Abandoned', 'Awarded', 'Suspended']),
 };
+
+// Teste si un statusShort représente un match en cours (y compris les minutes brutes "75")
+function isLiveStatus(s: string | null | undefined): boolean {
+  if (!s) return false;
+  if (STATUS_GROUPS.live.has(s)) return true;
+  return /^\d+(\+\d+)?$/.test(s); // "75", "45+2", etc.
+}
 
 const FILTER_EMPTY_LABELS: Record<StatusFilter, string> = {
   all:      'Aucun match disponible.',
@@ -33,7 +42,12 @@ export default function LivePage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('live');
   const { liveRefreshIntervalMs, setLiveRefreshInterval } = useUiControlsStore();
   const { data: health } = useHealth();
-  const { data, isLoading, isFetching, error, dataUpdatedAt } = useLiveFixtures();
+  // limit:100 = max autorisé par le backend (défaut 20) — on veut TOUS les matchs en cours
+  const { data, isLoading, isFetching, error, dataUpdatedAt } = useLiveFixtures({
+    limit: 100,
+    sortBy: 'matchDate',
+    sortOrder: 'ASC',
+  });
   const fixtures = data?.items ?? [];
   const changedScoreIds = useChangedScores(fixtures);
   const { setActiveFixture } = useUiControlsStore();
@@ -51,13 +65,14 @@ export default function LivePage() {
 
   const counts = useMemo<Record<StatusFilter, number>>(() => ({
     all:      fixtures.length,
-    live:     fixtures.filter((f) => STATUS_GROUPS.live.has(f.statusShort ?? '')).length,
+    live:     fixtures.filter((f) => isLiveStatus(f.statusShort)).length,
     upcoming: fixtures.filter((f) => STATUS_GROUPS.upcoming.has(f.statusShort ?? '')).length,
     finished: fixtures.filter((f) => STATUS_GROUPS.finished.has(f.statusShort ?? '')).length,
   }), [fixtures]);
 
   const filteredFixtures = useMemo<LiveFixture[]>(() => {
     if (statusFilter === 'all') return fixtures;
+    if (statusFilter === 'live') return fixtures.filter((f) => isLiveStatus(f.statusShort));
     return fixtures.filter((f) => STATUS_GROUPS[statusFilter].has(f.statusShort ?? ''));
   }, [fixtures, statusFilter]);
 

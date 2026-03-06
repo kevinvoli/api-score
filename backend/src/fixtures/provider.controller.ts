@@ -70,13 +70,19 @@ export class ProviderController {
 
   /**
    * Matches — always fresh from external API, then persisted.
+   * Paramètres optionnels `from` et `to` (YYYY-MM-DD) pour restreindre la plage.
+   * Sans ces params, la plage couvre automatiquement la saison en cours (juil → juin).
    */
   @Get('matches')
-  async getMatches(@Query('leagueId') leagueId?: string) {
+  async getMatches(
+    @Query('leagueId') leagueId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
     if (!leagueId) throw new BadRequestException('leagueId is required');
     const parsedLeague = Number(leagueId);
     if (Number.isNaN(parsedLeague)) throw new BadRequestException('leagueId must be a number');
-    const matches = await this.apiFootballClient.fetchLeagueFixtures(parsedLeague);
+    const matches = await this.apiFootballClient.fetchLeagueFixtures(parsedLeague, from, to);
     if (matches.length) await this.persistence.persistMatches(parsedLeague, matches);
     return matches;
   }

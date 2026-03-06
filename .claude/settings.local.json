@@ -12,7 +12,8 @@
       "Bash(cd \"C:\\\\Users\\\\gbamb\\\\Desktop\\\\projet\\\\api-score\\\\front\" && npx tsc --noEmit --skipLibCheck 2>&1)",
       "Bash(cd \"C:\\\\Users\\\\gbamb\\\\Desktop\\\\projet\\\\api-score\\\\backend\" && npx tsc --noEmit --skipLibCheck 2>&1)",
       "Bash(npx tsc:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(rm:*)"
     ]
   }
 }

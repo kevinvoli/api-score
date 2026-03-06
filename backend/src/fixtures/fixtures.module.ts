@@ -13,6 +13,7 @@ import { League } from '../database/entities/league.entity';
 import { Match } from '../database/entities/match.entity';
 import { Standing } from '../database/entities/standing.entity';
 import { ProviderApiFootballModule } from '../provider-api-football/provider-api-football.module';
+import { RecommendationsModule } from '../recommendations/recommendations.module';
 import { FixturesController } from './fixtures.controller';
 import { FixturesIngestionService } from './fixtures-ingestion.service';
 import { FixturesSyncScheduler } from './fixtures-sync.scheduler';
@@ -22,6 +23,7 @@ import { ProviderPersistenceService } from './provider-persistence.service';
 @Module({
   imports: [
     ProviderApiFootballModule,
+    RecommendationsModule,
     TypeOrmModule.forFeature([
       ApiUsageLog,
       ApiFootballPayload,

@@ -70,24 +70,60 @@ function MomentumBar({
   );
 }
 
+// ── Stats helpers ─────────────────────────────────────────────
+type StatEntry = { label: string; home: unknown; away: unknown };
+
+function extractStats(
+  home: Record<string, unknown> | undefined,
+  away: Record<string, unknown> | undefined,
+): StatEntry[] {
+  if (!home) return [];
+  // Format api-sports : { statistics: [{ type, value }, ...] }
+  const homeStat = home.statistics;
+  const awayStat = away?.statistics;
+  if (Array.isArray(homeStat)) {
+    return (homeStat as Array<{ type?: string; value?: unknown }>).map((entry) => {
+      const awayEntry = Array.isArray(awayStat)
+        ? (awayStat as Array<{ type?: string; value?: unknown }>).find((e) => e.type === entry.type)
+        : null;
+      return { label: entry.type ?? '—', home: entry.value, away: awayEntry?.value ?? null };
+    });
+  }
+  // Format plat : ignorer les valeurs non-primitives (tableaux, objets)
+  return Object.entries(home)
+    .filter(([, v]) => v != null && typeof v !== 'object')
+    .map(([k, v]) => ({ label: k, home: v, away: away?.[k] }));
+}
+
+function displayStat(v: unknown): string {
+  if (v === null || v === undefined || v === 'null') return '—';
+  return String(v);
+}
+
+function toStatNum(v: unknown): number {
+  if (v === null || v === undefined || v === 'null') return 0;
+  const n = Number(String(v).replace('%', ''));
+  return Number.isNaN(n) ? 0 : n;
+}
+
 // ── Stats row ─────────────────────────────────────────────────
 function StatRow({
   label, home, away,
 }: { label: string; home: unknown; away: unknown }) {
-  const h = Number(home ?? 0);
-  const a = Number(away ?? 0);
+  const h = toStatNum(home);
+  const a = toStatNum(away);
   const total = h + a || 1;
   const homePct = Math.round((h / total) * 100);
   return (
     <div className={styles.statRow}>
-      <span className={styles.statVal}>{String(home ?? '—')}</span>
+      <span className={styles.statVal}>{displayStat(home)}</span>
       <div className={styles.statCenter}>
         <span className={styles.statLabel}>{label}</span>
         <div className={styles.statBar}>
           <div className={styles.statBarHome} style={{ width: `${homePct}%` }} />
         </div>
       </div>
-      <span className={`${styles.statVal} ${styles.statValAway}`}>{String(away ?? '—')}</span>
+      <span className={`${styles.statVal} ${styles.statValAway}`}>{displayStat(away)}</span>
     </div>
   );
 }
@@ -111,9 +147,7 @@ function PanelContent({
   const homeStats = latestStats.find((s) => s.teamId === fix?.homeTeamId);
   const awayStats = latestStats.find((s) => s.teamId === fix?.awayTeamId);
 
-  const statKeys = homeStats
-    ? Object.keys(homeStats.stats).filter((k) => homeStats.stats[k] != null)
-    : [];
+  const statEntries = extractStats(homeStats?.stats, awayStats?.stats);
 
   return (
     <>
@@ -242,7 +276,7 @@ function PanelContent({
 
         {!isLoading && activeTab === 'stats' && (
           <div className={styles.tabContent}>
-            {statKeys.length === 0 ? (
+            {statEntries.length === 0 ? (
               <p className={styles.empty}>Statistiques indisponibles.</p>
             ) : (
               <>
@@ -251,13 +285,8 @@ function PanelContent({
                   <span />
                   <span>{fix?.awayTeamName ?? 'EXT'}</span>
                 </div>
-                {statKeys.map((key) => (
-                  <StatRow
-                    key={key}
-                    label={key}
-                    home={homeStats?.stats[key]}
-                    away={awayStats?.stats[key]}
-                  />
+                {statEntries.map(({ label, home, away }) => (
+                  <StatRow key={label} label={label} home={home} away={away} />
                 ))}
               </>
             )}

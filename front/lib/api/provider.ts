@@ -107,9 +107,17 @@ export const fetchProviderTeams = async (leagueId: number, refresh?: boolean): P
     query: { leagueId, ...(refresh ? { refresh: 'true' } : {}) },
   });
 
-export const fetchProviderMatches = async (leagueId: number): Promise<ProviderMatch[]> =>
+export const fetchProviderMatches = async (
+  leagueId: number,
+  from?: string,
+  to?: string,
+): Promise<ProviderMatch[]> =>
   apiFetch<ProviderMatch[]>('/v1/provider/matches', {
-    query: { leagueId },
+    query: {
+      leagueId,
+      ...(from ? { from } : {}),
+      ...(to   ? { to }   : {}),
+    },
   });
 
 export const fetchProviderStandings = async (leagueId: number): Promise<ProviderStanding[]> =>

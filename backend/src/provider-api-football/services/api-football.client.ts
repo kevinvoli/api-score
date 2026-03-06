@@ -226,18 +226,46 @@ export class ApiFootballClient {
     return Array.isArray(data) ? data : [];
   }
 
-  async fetchLeagueFixtures(leagueId: number): Promise<any[]> {
+  async fetchLeagueFixtures(leagueId: number, from?: string, to?: string): Promise<any[]> {
+    const { seasonFrom, seasonTo, seasonYear } = this.currentSeasonRange();
+    const dateFrom = from ?? seasonFrom;
+    const dateTo   = to   ?? seasonTo;
+    const timezone = this.configService.get<string>('API_FOOTBALL_TIMEZONE');
+
     if (this.provider === 'apifootball') {
       const data = await this.getApifootball(
         'get_events',
-        { league_id: leagueId },
+        {
+          league_id: leagueId,
+          from: dateFrom,
+          to: dateTo,
+          ...(timezone ? { timezone } : {}),
+        },
         'league_fixtures',
       );
       return Array.isArray(data) ? data : [];
     }
 
-    const data = await this.getApiSports('/fixtures', { league: leagueId }, 'league_fixtures');
+    const data = await this.getApiSports(
+      '/fixtures',
+      { league: leagueId, season: seasonYear },
+      'league_fixtures',
+    );
     return Array.isArray(data) ? data : [];
+  }
+
+  /** Calcule la plage de la saison en cours (juillet → juin). */
+  private currentSeasonRange(): { seasonFrom: string; seasonTo: string; seasonYear: number } {
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+    const year  = now.getFullYear();
+    // Saison démarre en juillet : si on est juil-déc → saison year/(year+1), sinon (year-1)/year
+    const seasonYear = month >= 7 ? year : year - 1;
+    return {
+      seasonYear,
+      seasonFrom: `${seasonYear}-07-01`,
+      seasonTo:   `${seasonYear + 1}-06-30`,
+    };
   }
 
   async fetchTeamById(teamId: number): Promise<any | null> {

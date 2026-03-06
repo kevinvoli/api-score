@@ -6,6 +6,7 @@ import { MoreThanOrEqual, Repository } from 'typeorm';
 import { JsonLogger } from '../common/json.logger';
 import { ApiUsageLog } from '../database/entities/api-usage-log.entity';
 import { FixturesIngestionService } from './fixtures-ingestion.service';
+import { SmartSuggestionsService } from '../recommendations/smart-suggestions.service';
 
 type JobState = 'active' | 'paused';
 
@@ -21,6 +22,7 @@ export class FixturesSyncScheduler implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly fixturesIngestionService: FixturesIngestionService,
+    private readonly smartSuggestionsService: SmartSuggestionsService,
     private readonly logger: JsonLogger,
     @InjectRepository(ApiUsageLog)
     private readonly apiUsageLogRepository: Repository<ApiUsageLog>,
@@ -107,6 +109,13 @@ export class FixturesSyncScheduler implements OnModuleInit, OnModuleDestroy {
     this.isSyncRunning = true;
     try {
       await this.fixturesIngestionService.syncLiveFixtures();
+      // Évaluer les règles métier immédiatement après chaque sync réussie
+      void this.smartSuggestionsService.evaluateAndSave().catch((err: unknown) => {
+        this.logger.warn(
+          { event: 'smart_suggestions_eval_failed', error: String(err) },
+          'FixturesSyncScheduler',
+        );
+      });
       this.onSyncSuccess();
     } catch (error) {
       this.logger.error(
