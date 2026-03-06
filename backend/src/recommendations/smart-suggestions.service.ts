@@ -87,48 +87,55 @@ export class SmartSuggestionsService {
   }
 
   /**
-   * Évalue toutes les règles, persiste les résultats dans bet_recommendations
-   * et smart_coupons, puis résout les coupons des matchs terminés.
+   * Évalue toutes les règles et persiste les nouvelles suggestions.
+   * La résolution des coupons est toujours exécutée en `finally` pour
+   * garantir qu'elle s'exécute même si la génération de suggestions échoue.
    */
   async evaluateAndSave(): Promise<void> {
-    const suggestions = await this.getAllSuggestions();
+    let suggestionCount = 0;
+    try {
+      const suggestions = await this.getAllSuggestions();
+      suggestionCount   = suggestions.length;
 
-    // ── BetRecommendation (existant) ──────────────────────────
-    if (suggestions.length) {
-      const fixtureIds = [...new Set(suggestions.map((s) => s.fixtureId))];
-      await this.recoRepo.delete({
-        fixtureId:  In(fixtureIds),
-        status:     'NEW',
-        marketType: In(AUTO_MARKET_TYPES),
-      });
-      await this.recoRepo.save(
-        suggestions.map((s) =>
-          this.recoRepo.create({
-            fixtureId:        s.fixtureId,
-            marketType:       s.marketType,
-            selection:        s.selection,
-            currentOdd:       s.currentOdd,
-            minAcceptableOdd: s.minAcceptableOdd,
-            edgePct:          s.edgePct,
-            confidenceScore:  s.confidenceScore,
-            reasons:          s.reasons,
-            riskFlags:        [],
-            status:           'NEW',
-          }),
-        ),
+      // ── BetRecommendation (existant) ──────────────────────────
+      if (suggestions.length) {
+        const fixtureIds = [...new Set(suggestions.map((s) => s.fixtureId))];
+        await this.recoRepo.delete({
+          fixtureId:  In(fixtureIds),
+          status:     'NEW',
+          marketType: In(AUTO_MARKET_TYPES),
+        });
+        await this.recoRepo.save(
+          suggestions.map((s) =>
+            this.recoRepo.create({
+              fixtureId:        s.fixtureId,
+              marketType:       s.marketType,
+              selection:        s.selection,
+              currentOdd:       s.currentOdd,
+              minAcceptableOdd: s.minAcceptableOdd,
+              edgePct:          s.edgePct,
+              confidenceScore:  s.confidenceScore,
+              reasons:          s.reasons,
+              riskFlags:        [],
+              status:           'NEW',
+            }),
+          ),
+        );
+      }
+
+      // ── SmartCoupon (nouveau) ─────────────────────────────────
+      await this.saveCoupons(suggestions);
+
+      this.logger.log(
+        { event: 'smart_suggestions_saved', count: suggestions.length },
+        'SmartSuggestionsService',
       );
+    } finally {
+      // ── Résolution systématique à chaque sync ─────────────────
+      // Exécutée même si la génération de suggestions a échoué :
+      // vérifie buts marqués en live ET matchs terminés (WON/LOST).
+      await this.resolveSettledCoupons();
     }
-
-    // ── SmartCoupon (nouveau) ─────────────────────────────────
-    await this.saveCoupons(suggestions);
-
-    // ── Résolution automatique ────────────────────────────────
-    await this.resolveSettledCoupons();
-
-    this.logger.log(
-      { event: 'smart_suggestions_saved', count: suggestions.length },
-      'SmartSuggestionsService',
-    );
   }
 
   /** Historique paginé des coupons (tous statuts). */
@@ -227,46 +234,72 @@ export class SmartSuggestionsService {
   }
 
   /**
-   * Retourne 'WON' | 'LOST' si le résultat est connu, null si le match
-   * n'est pas encore à un stade permettant la résolution.
+   * Résolution en temps réel : vérifie à chaque sync si la prédiction est déjà
+   * réalisée (WON dès qu'un but est détecté), ou si la période est closes sans
+   * but (LOST). Retourne null tant que c'est indécidable.
+   *
+   * Principe :
+   *  - WON  → détectable dès que le score change dans la bonne période
+   *  - LOST → seulement quand la période se ferme (HT passé / match terminé)
    */
   private resolveCouponOutcome(
     coupon: SmartCoupon,
     fixture: Fixture,
     statusShort: string,
   ): 'WON' | 'LOST' | null {
-    // Match annulé / reporté / interrompu → coupon perdu (période ne se jouera pas)
+    // Match annulé / reporté / interrompu → coupon perdu
     if (VOID_STATUSES.has(statusShort)) return 'LOST';
 
-    const raw = (fixture.raw ?? {}) as Record<string, unknown>;
+    const raw    = (fixture.raw ?? {}) as Record<string, unknown>;
+    const isHome = coupon.isHomeTeam;
 
     // ── Buts 1ère mi-temps ──────────────────────────────────────
+    // WON dès qu'un but est marqué pendant la 1H (score live > 0 pour l'équipe)
+    // LOST quand la MT est terminée et le score HT = 0
     if (coupon.marketType === 'Buts 1ère mi-temps') {
-      if (!POST_HT_STATUSES.has(statusShort)) return null;
-      const htHome = this.extractHtScore(raw, true);
-      const htAway = this.extractHtScore(raw, false);
-      const teamHt = coupon.isHomeTeam ? htHome : htAway;
-      if (teamHt === null) return null;
-      return teamHt > 0 ? 'WON' : 'LOST';
+      // Pendant la 1H : vérifier le score live
+      if (FIRST_HALF_STATUSES.includes(statusShort)) {
+        const liveScore = isHome ? fixture.scoreHome : fixture.scoreAway;
+        if (liveScore != null && liveScore > 0) return 'WON';
+        return null; // 1H en cours, pas encore de but
+      }
+      // Après la 1H : score HT définitif disponible
+      if (POST_HT_STATUSES.has(statusShort)) {
+        const htScore = this.extractHtScore(raw, isHome);
+        if (htScore === null) return null; // score HT manquant, attendre
+        return htScore > 0 ? 'WON' : 'LOST';
+      }
+      return null;
     }
 
     // ── Buts match ──────────────────────────────────────────────
+    // WON dès qu'un but est marqué à n'importe quel moment du match
+    // LOST seulement quand le match est terminé avec score = 0
     if (coupon.marketType === 'Buts match') {
-      if (!FINISHED_STATUSES.has(statusShort)) return null;
-      const teamScore = coupon.isHomeTeam ? fixture.scoreHome : fixture.scoreAway;
-      if (teamScore === null || teamScore === undefined) return null;
-      return teamScore > 0 ? 'WON' : 'LOST';
+      const teamScore = isHome ? fixture.scoreHome : fixture.scoreAway;
+      if (teamScore != null && teamScore > 0) return 'WON'; // but déjà marqué → WON immédiat
+      if (FINISHED_STATUSES.has(statusShort)) return 'LOST'; // match fini, score = 0
+      return null; // match en cours, score = 0 pour l'instant
     }
 
     // ── Buts 2ème mi-temps ──────────────────────────────────────
+    // WON dès qu'un but est marqué en 2H (score actuel - score HT > 0)
+    // LOST seulement quand le match est terminé sans but en 2H
     if (coupon.marketType === 'Buts 2ème mi-temps') {
-      if (!FINISHED_STATUSES.has(statusShort)) return null;
-      const ftScore = coupon.isHomeTeam ? fixture.scoreHome : fixture.scoreAway;
-      const htScore = this.extractHtScore(raw, coupon.isHomeTeam);
-      if (ftScore === null || ftScore === undefined) return null;
-      // Si on ne peut pas déterminer le score HT, on utilise juste le score FT
-      const secondHalfGoals = htScore !== null ? ftScore - htScore : ftScore;
-      return secondHalfGoals > 0 ? 'WON' : 'LOST';
+      const currentScore = isHome ? fixture.scoreHome : fixture.scoreAway;
+      const htScore      = this.extractHtScore(raw, isHome);
+
+      if (currentScore != null && htScore !== null) {
+        // Calcul des buts marqués depuis la MT (valable en live et en fin de match)
+        const secondHalfGoals = currentScore - htScore;
+        if (secondHalfGoals > 0) return 'WON'; // but en 2MT déjà marqué → WON immédiat
+      } else if (currentScore != null && htScore === null) {
+        // Score HT inconnu : si le match est fini et score > 0, WON
+        if (FINISHED_STATUSES.has(statusShort) && currentScore > 0) return 'WON';
+      }
+
+      if (FINISHED_STATUSES.has(statusShort)) return 'LOST'; // match fini, pas de but en 2MT
+      return null; // 2H en cours, pas encore de but en 2MT
     }
 
     return null;

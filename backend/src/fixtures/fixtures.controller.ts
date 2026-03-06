@@ -14,8 +14,13 @@ export class FixturesController {
   @Post('sync')
   async syncLiveFixtures() {
     const result = await this.fixturesIngestionService.syncLiveFixtures();
-    // Re-evaluate smart suggestions after each manual sync
-    await this.smartSuggestionsService.evaluateAndSave().catch(() => undefined);
+    // Génère les nouvelles suggestions ET résout les coupons PENDING
+    // (buts marqués en live + matchs terminés → WON/LOST)
+    await this.smartSuggestionsService.evaluateAndSave().catch((err: unknown) => {
+      // evaluateAndSave appelle toujours resolveSettledCoupons en finally,
+      // donc la résolution s'est exécutée même si la génération a échoué.
+      void err;
+    });
     return result;
   }
 
