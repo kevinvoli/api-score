@@ -5,10 +5,10 @@ import { SystemStatusPill } from '../../components/system-status-pill/SystemStat
 import { SyncButton } from '../../components/sync-button/SyncButton';
 import { Loader, SkeletonList } from '../../components/loader/Loader';
 import { useHealth } from '../../lib/hooks/useHealth';
-import { useLiveFixtures, LIVE_FIXTURES_REFETCH_INTERVAL_MS } from '../../lib/hooks/useLiveFixtures';
+import { useLiveFixtures } from '../../lib/hooks/useLiveFixtures';
 import { useCountdown } from '../../lib/hooks/useCountdown';
 import { useChangedScores } from '../../lib/hooks/useChangedScores';
-import { useUiControlsStore } from '../../lib/state/uiControls';
+import { useUiControlsStore, REFRESH_INTERVAL_OPTIONS } from '../../lib/state/uiControls';
 import { useMemo, useState } from 'react';
 import type { LiveFixture } from '../../lib/types/live';
 
@@ -31,13 +31,14 @@ const heroTitle = 'Un dashboard live pour décider vite';
 
 export default function LivePage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('live');
+  const { liveRefreshIntervalMs, setLiveRefreshInterval } = useUiControlsStore();
   const { data: health } = useHealth();
   const { data, isLoading, isFetching, error, dataUpdatedAt } = useLiveFixtures();
   const fixtures = data?.items ?? [];
   const changedScoreIds = useChangedScores(fixtures);
   const { setActiveFixture } = useUiControlsStore();
 
-  const nextRefreshAt = dataUpdatedAt + LIVE_FIXTURES_REFETCH_INTERVAL_MS;
+  const nextRefreshAt = dataUpdatedAt + liveRefreshIntervalMs;
   const secondsToRefresh = useCountdown(nextRefreshAt);
 
   const updatedAtLabel = dataUpdatedAt
@@ -90,7 +91,7 @@ export default function LivePage() {
         <p className="eyebrow">Live</p>
         <h1>{heroTitle}</h1>
         <p className="lead">
-          Suivez les matchs en temps réel et lancez une analyse dès qu'un signal se déclenche.
+          Suivez les matchs en temps réel et lancez une analyse dès qu&apos;un signal se déclenche.
         </p>
         <SystemStatusPill status={status} message={statusMessage} />
       </div>
@@ -116,11 +117,33 @@ export default function LivePage() {
                 Mis à jour {updatedAtLabel}
               </span>
             )}
-            {!isFetching && dataUpdatedAt > 0 && (
+            {!isFetching && dataUpdatedAt > 0 && liveRefreshIntervalMs > 0 && (
               <span className="live-countdown">
                 ↻ {secondsToRefresh}s
               </span>
             )}
+            {liveRefreshIntervalMs === 0 && (
+              <span className="live-manual-badge">Manuel</span>
+            )}
+
+            <div className="live-interval-group">
+              <label className="live-interval-label" htmlFor="live-interval">
+                Refresh
+              </label>
+              <select
+                id="live-interval"
+                className="live-interval-select"
+                value={liveRefreshIntervalMs}
+                onChange={(e) => setLiveRefreshInterval(Number(e.target.value))}
+              >
+                {REFRESH_INTERVAL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <SyncButton />
           </div>
         </div>

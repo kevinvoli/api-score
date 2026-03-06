@@ -199,7 +199,7 @@ function PanelContent({
                     <p className={styles.sectionLabel}>Derniers événements</p>
                     {sum.recentEvents.map((e, i) => (
                       <div key={i} className={styles.eventRow}>
-                        <span className={styles.eventMinute}>{e.minute ?? '—'}'</span>
+                        <span className={styles.eventMinute}>{e.minute ?? '—'}&apos;</span>
                         <span className={styles.eventIcon}>{eventIcon(e.type)}</span>
                         <span className={styles.eventDetail}>{e.detail ?? e.type ?? '—'}</span>
                       </div>
@@ -223,12 +223,12 @@ function PanelContent({
             ) : (
               events.map((e) => (
                 <div key={e.id} className={styles.eventRow}>
-                  <span className={styles.eventMinute}>{e.minute ?? '—'}'</span>
+                  <span className={styles.eventMinute}>{e.minute ?? '—'}&apos;</span>
                   <span className={styles.eventIcon}>{eventIcon(e.eventType)}</span>
                   <div className={styles.eventInfo}>
                     <span className={styles.eventDetail}>{e.detail ?? e.eventType ?? '—'}</span>
                     {e.extra != null && (
-                      <span className={styles.eventExtra}>+{e.extra}'</span>
+                      <span className={styles.eventExtra}>+{e.extra}&apos;</span>
                     )}
                   </div>
                   <span className={styles.eventTeam}>

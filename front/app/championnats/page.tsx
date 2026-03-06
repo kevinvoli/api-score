@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useProviderExplorer } from '../../lib/providerExplorerContext';
-import { useProviderMatches, useProviderStandings } from '../../lib/hooks/useProviderData';
+import { useProviderMatches, useProviderStandings, useSyncProvider } from '../../lib/hooks/useProviderData';
 import { Loader, SkeletonList } from '../../components/loader/Loader';
 
 type Tab = 'matches' | 'standings' | 'teams';
@@ -25,8 +25,13 @@ export default function ChampionnatsPage() {
 
   const matchesQuery = useProviderMatches(selectedLeagueId ?? undefined);
   const standingsQuery = useProviderStandings(selectedLeagueId ?? undefined);
+  const { sync, isSyncing } = useSyncProvider({
+    countryId: selectedCountryId ?? undefined,
+    leagueId: selectedLeagueId ?? undefined,
+  });
   const matches = matchesQuery.data ?? [];
   const standings = standingsQuery.data ?? [];
+  const matchesError = matchesQuery.error;
 
   const selectedCountry = useMemo(
     () => countries.find((c) => c.country_id === selectedCountryId),
@@ -119,6 +124,18 @@ export default function ChampionnatsPage() {
           )}
         </div>
 
+        {/* Bouton sync */}
+        <button
+          type="button"
+          className="champ-sync-btn"
+          onClick={sync}
+          disabled={isSyncing}
+          title="Recharger depuis l'API externe"
+        >
+          {isSyncing ? <Loader size={14} /> : '↻'}
+          {isSyncing ? 'Sync...' : 'Rafraîchir'}
+        </button>
+
         {/* Info sélection */}
         {selectedLeague && (
           <div className="champ-sel-info">
@@ -159,9 +176,31 @@ export default function ChampionnatsPage() {
           {/* ── TAB: Matchs ── */}
           {activeTab === 'matches' && (
             <div className="champ-tab-body">
-              {matchesQuery.isLoading && <SkeletonList count={8} />}
-              {!matchesQuery.isLoading && !matches.length && (
-                <p className="champ-empty">Aucun match trouvé pour ce championnat.</p>
+              {matchesQuery.isLoading && (
+                <div className="champ-loading-state">
+                  <Loader size={20} centered />
+                  <p className="champ-loading-label">Récupération des matchs depuis l&apos;API…</p>
+                </div>
+              )}
+              {!matchesQuery.isLoading && matchesError && (
+                <div className="champ-error-state">
+                  <p className="champ-error-title">Impossible de charger les matchs</p>
+                  <p className="champ-error-hint">Vérifie la connexion au backend ou le quota API, puis clique sur Rafraîchir.</p>
+                  <button type="button" className="champ-sync-btn" onClick={sync} disabled={isSyncing}>
+                    {isSyncing ? <Loader size={14} /> : '↻'} Réessayer
+                  </button>
+                </div>
+              )}
+              {!matchesQuery.isLoading && !matchesError && !matches.length && (
+                <div className="champ-empty-state">
+                  <p className="champ-empty">Aucun match trouvé pour ce championnat.</p>
+                  <p className="champ-empty" style={{ fontSize: '0.8rem' }}>
+                    Les données peuvent ne pas être disponibles pour la saison en cours. Essaie de rafraîchir.
+                  </p>
+                  <button type="button" className="champ-sync-btn" onClick={sync} disabled={isSyncing} style={{ marginTop: '8px' }}>
+                    {isSyncing ? <Loader size={14} /> : '↻'} Rafraîchir depuis l&apos;API
+                  </button>
+                </div>
               )}
               {!matchesQuery.isLoading && Object.entries(groupedMatches).map(([date, dayMatches]) => (
                 <div key={date} className="champ-day-group">

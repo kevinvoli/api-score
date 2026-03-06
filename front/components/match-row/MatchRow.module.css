@@ -1,12 +1,13 @@
 .row {
   display: grid;
-  grid-template-columns: 72px 1fr auto auto;
+  grid-template-columns: 60px 1fr auto auto;
   align-items: center;
   gap: 0;
-  padding: 0 16px;
-  min-height: 48px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  transition: background 0.12s ease;
+  padding: 0 12px 0 14px;
+  min-height: 44px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.1s ease;
+  cursor: default;
 }
 
 .row:last-child {
@@ -14,94 +15,122 @@
 }
 
 .row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.025);
 }
 
-/* ── Status column ── */
+/* ── Statut ── */
 .statusLive,
 .statusHt,
 .statusFt,
 .statusTime {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.78rem;
+  gap: 4px;
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
-.statusLive {
-  color: var(--color-success);
-  font-weight: 600;
+.statusText {
+  font-weight: 700;
 }
 
-.statusHt {
-  color: var(--color-warning);
-  font-weight: 600;
-}
-
-.statusFt {
-  color: var(--color-text-secondary);
-}
-
-.statusTime {
-  color: var(--color-text-secondary);
-}
+.statusLive { color: #22c55e; }
+.statusHt   { color: #f59e0b; }
+.statusFt   { color: var(--color-text-secondary); font-weight: 500; }
+.statusTime { color: var(--color-text-secondary); }
 
 .dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--color-success);
+  background: #22c55e;
   flex-shrink: 0;
   animation: pulse 1.4s ease-in-out infinite;
 }
 
 .dotHt {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--color-warning);
+  background: #f59e0b;
   flex-shrink: 0;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 3px rgba(34,197,94,0); }
 }
 
-/* ── Match column ── */
+/* ── Colonne match ── */
 .match {
   display: grid;
-  grid-template-columns: 1fr 64px 1fr;
+  grid-template-columns: 1fr 72px 1fr;
   align-items: center;
-  gap: 8px;
-  padding: 0 16px;
+  gap: 6px;
+  padding: 0 12px;
+  min-width: 0;
 }
 
-.team {
-  font-size: 0.92rem;
+/* Équipe domicile (alignée à droite) */
+.teamHome {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Équipe extérieure (alignée à gauche) */
+.teamAway {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.teamName {
+  font-size: 0.9rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
+  color: var(--color-text-primary);
+  font-weight: 500;
 }
 
-.teamAway {
-  text-align: left;
+.badge {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+/* Bloc score centré */
+.scoreWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .score {
   font-family: var(--font-heading);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   text-align: center;
   font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
   white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 6px;
-  padding: 2px 6px;
+  padding: 3px 8px;
+  letter-spacing: 0.04em;
   transition: background 0.3s;
+  min-width: 52px;
 }
 
 .scoreFlash {
@@ -109,32 +138,17 @@
 }
 
 @keyframes goalFlash {
-  0%   {
-    background: rgba(34, 197, 94, 0.55);
-    color: #fff;
-    transform: scale(1.25);
-    box-shadow: 0 0 12px rgba(34, 197, 94, 0.6);
-  }
-  20%  {
-    background: rgba(34, 197, 94, 0.35);
-    transform: scale(1.12);
-  }
-  60%  {
-    background: rgba(34, 197, 94, 0.15);
-    transform: scale(1.02);
-  }
-  100% {
-    background: transparent;
-    transform: scale(1);
-    box-shadow: none;
-  }
+  0%   { background: rgba(34,197,94,0.6); color: #fff; transform: scale(1.2); box-shadow: 0 0 14px rgba(34,197,94,0.5); }
+  20%  { background: rgba(34,197,94,0.35); transform: scale(1.08); }
+  60%  { background: rgba(34,197,94,0.15); transform: scale(1.02); }
+  100% { background: rgba(255,255,255,0.06); transform: scale(1); box-shadow: none; }
 }
 
-/* ── Odds column ── */
+/* ── Cotes ── */
 .odds {
   display: flex;
-  gap: 4px;
-  padding: 0 12px;
+  gap: 3px;
+  padding: 0 10px;
 }
 
 .oddBtn {
@@ -142,11 +156,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 54px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  width: 50px;
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
   cursor: not-allowed;
   gap: 1px;
   transition: background 0.12s, border-color 0.12s;
@@ -157,50 +171,49 @@
 }
 
 .oddBtn:not(:disabled):hover {
-  background: rgba(41, 182, 246, 0.15);
-  border-color: rgba(41, 182, 246, 0.4);
-}
-
-.oddBtn:not(:disabled).selected {
-  background: rgba(41, 182, 246, 0.25);
-  border-color: rgba(41, 182, 246, 0.7);
+  background: rgba(41, 182, 246, 0.12);
+  border-color: rgba(41, 182, 246, 0.35);
 }
 
 .oddLabel {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--color-text-secondary);
   line-height: 1;
+  font-weight: 600;
 }
 
 .oddVal {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
   line-height: 1;
 }
 
-.oddBtn:disabled .oddVal {
-  color: var(--color-text-secondary);
+.oddBtn:not(:disabled) .oddVal {
+  color: var(--color-text-primary);
 }
 
-/* ── Analyze button ── */
+/* ── Bouton analyser ── */
 .analyzeBtn {
-  font-size: 0.78rem;
-  padding: 5px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  white-space: nowrap;
   transition: color 0.12s, border-color 0.12s, background 0.12s;
+  flex-shrink: 0;
 }
 
 .analyzeBtn:hover {
-  color: var(--color-text-primary);
-  border-color: rgba(41, 182, 246, 0.5);
+  color: var(--color-info);
+  border-color: rgba(41, 182, 246, 0.4);
   background: rgba(41, 182, 246, 0.08);
 }

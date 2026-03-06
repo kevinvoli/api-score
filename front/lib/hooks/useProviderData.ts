@@ -11,7 +11,7 @@ import {
 export const useProviderCountries = () =>
   useQuery({
     queryKey: ['provider', 'countries'],
-    queryFn: fetchProviderCountries,
+    queryFn: () => fetchProviderCountries(),
     staleTime: 1000 * 60 * 5,
   });
 
@@ -45,3 +45,37 @@ export const useProviderStandings = (leagueId?: number) =>
     enabled: Boolean(leagueId),
     staleTime: 1000 * 60 * 5,
   });
+
+/**
+ * Provides sync functions that force re-fetch from the external API
+ * (bypassing the DB cache) and then invalidate React Query cache.
+ */
+export function useSyncProvider(options?: { countryId?: number; leagueId?: number }) {
+  const queryClient = useQueryClient();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const sync = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      await fetchProviderCountries(true);
+      await queryClient.invalidateQueries({ queryKey: ['provider', 'countries'] });
+
+      if (options?.countryId != null) {
+        await fetchProviderLeagues(options.countryId, true);
+        await queryClient.invalidateQueries({ queryKey: ['provider', 'leagues'] });
+      }
+
+      if (options?.leagueId != null) {
+        await fetchProviderTeams(options.leagueId, true);
+        await queryClient.invalidateQueries({ queryKey: ['provider', 'teams'] });
+        // Invalider ET forcer le refetch des matchs pour ce championnat
+        await queryClient.invalidateQueries({ queryKey: ['provider', 'matches', options.leagueId] });
+        await queryClient.refetchQueries({ queryKey: ['provider', 'matches', options.leagueId] });
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [queryClient, options?.countryId, options?.leagueId]);
+
+  return { sync, isSyncing };
+}

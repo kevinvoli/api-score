@@ -8,8 +8,8 @@ type Props = {
 };
 
 const LIVE_STATUSES = new Set(['1H', '2H', 'ET', 'P', 'LIVE', 'INT', 'BT']);
-const HT_STATUSES = new Set(['HT', 'BT']);
-const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'AWD', 'WO', 'ABD']);
+const HT_STATUSES  = new Set(['HT', 'BT']);
+const FT_STATUSES  = new Set(['FT', 'AET', 'PEN', 'AWD', 'WO', 'ABD']);
 
 function StatusCell({ statusShort, elapsed, matchDate }: {
   statusShort: string | null;
@@ -22,58 +22,77 @@ function StatusCell({ statusShort, elapsed, matchDate }: {
     return (
       <div className={styles.statusLive}>
         <span className={styles.dot} />
-        <span>{elapsed != null ? `${elapsed}'` : 'LIVE'}</span>
+        <span className={styles.statusText}>{elapsed != null ? `${elapsed}'` : 'LIVE'}</span>
       </div>
     );
   }
-
   if (HT_STATUSES.has(s)) {
     return (
       <div className={styles.statusHt}>
         <span className={styles.dotHt} />
-        <span>MT</span>
+        <span className={styles.statusText}>MT</span>
       </div>
     );
   }
-
-  if (FINISHED_STATUSES.has(s)) {
+  if (FT_STATUSES.has(s)) {
     return <div className={styles.statusFt}>FT</div>;
   }
-
   if (matchDate) {
     const d = new Date(matchDate);
     const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     return <div className={styles.statusTime}>{time}</div>;
   }
-
   return <div className={styles.statusTime}>{s || '—'}</div>;
+}
+
+function Badge({ src, alt }: { src: string; alt: string }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={styles.badge}
+      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+    />
+  );
 }
 
 export function MatchRow({ fixture, scoreChanged = false, onAnalyze }: Props) {
   const home = fixture.homeTeamName ?? 'Domicile';
   const away = fixture.awayTeamName ?? 'Extérieur';
-  const hasScore =
-    fixture.scoreHome != null && fixture.scoreAway != null;
+  const hasScore = fixture.scoreHome != null && fixture.scoreAway != null;
 
   return (
     <div className={styles.row} role="row">
+      {/* Colonne statut */}
       <StatusCell
         statusShort={fixture.statusShort}
         elapsed={fixture.elapsed}
         matchDate={fixture.matchDate}
       />
 
+      {/* Colonne match : [équipe dom] [score] [équipe ext] */}
       <div className={styles.match}>
-        <span className={styles.team} title={home}>{home}</span>
-        <span
-          className={`${styles.score} ${scoreChanged ? styles.scoreFlash : ''}`}
-          key={scoreChanged ? 'changed' : 'stable'}
-        >
-          {hasScore ? `${fixture.scoreHome} - ${fixture.scoreAway}` : '-'}
-        </span>
-        <span className={`${styles.team} ${styles.teamAway}`} title={away}>{away}</span>
+        <div className={styles.teamHome}>
+          <span className={styles.teamName} title={home}>{home}</span>
+          {fixture.homeTeamBadge && <Badge src={fixture.homeTeamBadge} alt={home} />}
+        </div>
+
+        <div className={styles.scoreWrap}>
+          <span
+            className={`${styles.score} ${scoreChanged ? styles.scoreFlash : ''}`}
+            key={scoreChanged ? 'changed' : 'stable'}
+          >
+            {hasScore ? `${fixture.scoreHome} - ${fixture.scoreAway}` : 'vs'}
+          </span>
+        </div>
+
+        <div className={styles.teamAway}>
+          {fixture.awayTeamBadge && <Badge src={fixture.awayTeamBadge} alt={away} />}
+          <span className={styles.teamName} title={away}>{away}</span>
+        </div>
       </div>
 
+      {/* Colonne cotes */}
       <div className={styles.odds}>
         <button type="button" className={styles.oddBtn} disabled>
           <span className={styles.oddLabel}>1</span>
@@ -89,13 +108,16 @@ export function MatchRow({ fixture, scoreChanged = false, onAnalyze }: Props) {
         </button>
       </div>
 
+      {/* Bouton analyser */}
       <button
         type="button"
         className={styles.analyzeBtn}
         onClick={onAnalyze}
         title="Analyser ce match"
       >
-        Analyser
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </button>
     </div>
   );
