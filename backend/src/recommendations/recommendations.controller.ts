@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { GetLiveRecommendationsQueryDto } from './dto/get-live-recommendations-query.dto';
 import { RecommendationsService } from './recommendations.service';
 import { SmartSuggestionsService } from './smart-suggestions.service';
@@ -19,6 +19,12 @@ export class RecommendationsController {
   @Get('smart')
   getSmartSuggestions() {
     return this.smartSuggestionsService.getAllSuggestions();
+  }
+
+  /** Force la résolution de tous les coupons PENDING (rattrapage). */
+  @Post('coupons/resolve')
+  resolveAllPendingCoupons() {
+    return this.smartSuggestionsService.resolveSettledCoupons();
   }
 
   /** Historique paginé des coupons (PENDING / WON / LOST) */

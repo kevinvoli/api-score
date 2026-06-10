@@ -840,6 +840,8 @@ export class FixturesIngestionService {
       Awarded:        'AWD',
       Suspended:      'SUSP',
       'Not Coverage': 'NS',
+      // apifootball termine parfois les matchs aux tirs au but avec 'Pen.'
+      'Pen.':         'PEN',
     };
     return MAP[raw] ?? raw;
   }

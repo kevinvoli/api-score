@@ -37,11 +37,13 @@ const SECOND_HALF_STATUSES = ['2H', 'LIVE'];
 const AUTO_MARKET_TYPES    = ['Buts 1ère mi-temps', 'Buts match', 'Buts 2ème mi-temps'];
 
 // Statuts indiquant que la mi-temps est terminée (score HT connu)
+// Valeurs normalisées par normalizeApifootballStatus + api-sports status.short
 const POST_HT_STATUSES = new Set(['HT', '2H', 'ET', 'BT', 'P', 'FT', 'AET', 'PEN', 'AWD', 'WO']);
 // Statuts indiquant que le match est terminé (score FT connu)
 const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'AWD', 'WO']);
-// Statuts indiquant que le match ne se jouera pas / a été interrompu définitivement → coupon LOST
-const VOID_STATUSES = new Set(['Cancelled', 'Postponed', 'INT', 'Susp', 'ABD', 'TBD']);
+// Statuts "voids" : match annulé / reporté / interrompu définitivement → coupon LOST
+// Valeurs normalisées : Cancelled→CANC, Postponed→PST, Suspended→SUSP, Pen.→PEN (déjà dans FINISHED)
+const VOID_STATUSES = new Set(['CANC', 'PST', 'INT', 'SUSP', 'ABD', 'TBD', 'WO']);
 
 type SuggestionPartial = Pick<
   SmartSuggestion,
