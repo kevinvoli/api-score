@@ -1,7 +1,7 @@
-import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { IsIn, IsOptional, IsUUID } from 'class-validator';
 
-export class GetLiveRecommendationsQueryDto {
+export class GetLiveRecommendationsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   fixtureId?: string;
@@ -10,16 +10,5 @@ export class GetLiveRecommendationsQueryDto {
   @IsIn(['NEW', 'ACTIVE', 'REJECTED'])
   status?: 'NEW' | 'ACTIVE' | 'REJECTED';
 
-  @IsOptional()
-  @Transform(({ value }) => Number(value))
-  @IsInt()
-  @Min(1)
-  page?: number = 1;
 
-  @IsOptional()
-  @Transform(({ value }) => Number(value))
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number = 20;
 }

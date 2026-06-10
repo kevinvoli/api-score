@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
 import { SmartRulesConfigService, SmartRulesConfig } from './smart-rules-config.service';
+import { UpdateSmartRulesDto } from './dto/update-smart-rules.dto';
 
 @Controller('settings/smart-rules')
 export class SmartRulesController {
@@ -11,7 +12,7 @@ export class SmartRulesController {
   }
 
   @Put()
-  updateConfig(@Body() body: SmartRulesConfig): Promise<SmartRulesConfig> {
-    return this.configService.updateConfig(body);
+  updateConfig(@Body() dto: UpdateSmartRulesDto): Promise<SmartRulesConfig> {
+    return this.configService.updateConfig(dto as unknown as SmartRulesConfig);
   }
 }

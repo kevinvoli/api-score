@@ -32,8 +32,8 @@ export class ApiUsageLog {
   @Column({ type: 'int', nullable: true })
   rateLimitRemaining: number | null;
 
-  @CreateDateColumn({ type: 'datetime' })
-  calledAt: Date;
+  @Column({ type: 'datetime', nullable: true })
+  calledAt: Date | null;
 
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;

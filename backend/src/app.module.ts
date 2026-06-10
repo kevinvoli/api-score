@@ -1,7 +1,9 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ApiKeyGuard } from './common/guards/api-key.guard';
 import { CommonModule } from './common/common.module';
 import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
 import { TraceIdMiddleware } from './common/middleware/trace-id.middleware';
@@ -34,7 +36,10 @@ import { TeamsModule } from './teams/teams.module';
     TeamsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

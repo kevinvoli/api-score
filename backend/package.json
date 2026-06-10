@@ -36,7 +36,6 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/schedule": "^6.1.1",
     "@nestjs/typeorm": "^11.0.0",
-    "api-score": "file:",
     "axios": "^1.7.9",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",

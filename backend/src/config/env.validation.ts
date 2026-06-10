@@ -8,6 +8,7 @@ import {
   IsString,
   Max,
   Min,
+  MinLength,
   validateSync,
 } from 'class-validator';
 
@@ -75,6 +76,46 @@ class EnvironmentVariables {
   @Min(0)
   @Max(300000)
   LIVE_READ_CACHE_TTL_MS: number;
+
+  @IsString()
+  @MinLength(16)
+  API_KEY: string;
+
+  @IsOptional()
+  @IsIn(['apisports', 'apifootball'])
+  API_FOOTBALL_VENDOR?: string = 'apisports';
+
+  @IsOptional()
+  @IsString()
+  API_FOOTBALL_TIMEZONE?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  SCHEDULER_MAX_CONSECUTIVE_FAILURES?: number = 5;
+
+  @IsOptional()
+  @IsInt()
+  @Min(60000)
+  SCHEDULER_PAUSE_DURATION_MS?: number = 300000;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  ALERT_ERROR_RATE_PCT?: number = 20;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  ALERT_TIMEOUT_RATE_PCT?: number = 20;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  ALERT_QUOTA_REMAINING_MIN_PCT?: number = 10;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

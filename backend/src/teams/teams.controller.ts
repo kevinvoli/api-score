@@ -26,6 +26,6 @@ export class TeamsController {
   @Get(':teamKey/full')
   async getTeamFull(@Param('teamKey', ParseIntPipe) teamKey: number) {
     const team = await this.teamsService.getTeamByKey(teamKey);
-    return team ? { ...team, raw: team.raw } : null;
+    return team;
   }
 }

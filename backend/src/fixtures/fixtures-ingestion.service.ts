@@ -11,6 +11,7 @@ import { Fixture } from '../database/entities/fixture.entity';
 import { Team } from '../database/entities/team.entity';
 import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
 import { GetLiveFixturesQueryDto } from './dto/get-live-fixtures-query.dto';
+import { toNumber, getStatValue, computePressureIndex } from '../common/utils/stats.utils';
 
 @Injectable()
 export class FixturesIngestionService {
@@ -336,8 +337,8 @@ export class FixturesIngestionService {
     const homeStats = latestStats.find((row) => row.teamId === fixture.homeTeamId) ?? null;
     const awayStats = latestStats.find((row) => row.teamId === fixture.awayTeamId) ?? null;
 
-    const homePressureIndex = this.computePressureIndex(homeStats?.stats ?? null);
-    const awayPressureIndex = this.computePressureIndex(awayStats?.stats ?? null);
+    const homePressureIndex = computePressureIndex(homeStats?.stats ?? null);
+    const awayPressureIndex = computePressureIndex(awayStats?.stats ?? null);
 
     const hasRecentStats = latestStats.length > 0;
     const hasLineups = latestLineups.length > 0;
@@ -576,7 +577,7 @@ export class FixturesIngestionService {
   }
 
   private normalizeTeamPayload(payload: Record<string, any>, leagueId: number | null): Team | null {
-    const teamKey = this.toNumber(payload?.team_key ?? payload?.team?.id ?? payload?.team_id);
+    const teamKey = toNumber(payload?.team_key ?? payload?.team?.id ?? payload?.team_id);
     const name =
       payload?.team_name ??
       payload?.team?.name ??
@@ -588,7 +589,7 @@ export class FixturesIngestionService {
     }
 
     const venuePayload = payload?.venue ?? payload?.team?.venue ?? null;
-    const venueId = this.toNumber(venuePayload?.id ?? payload?.venue_id);
+    const venueId = toNumber(venuePayload?.id ?? payload?.venue_id);
 
     return {
       id: undefined as unknown as string,
@@ -600,7 +601,7 @@ export class FixturesIngestionService {
         payload?.code ??
         null,
       country: payload?.team_country ?? payload?.team?.country ?? payload?.country ?? null,
-      founded: this.toNumber(payload?.team_founded ?? payload?.team?.founded ?? payload?.founded),
+      founded: toNumber(payload?.team_founded ?? payload?.team?.founded ?? payload?.founded),
       national:
         payload?.team_national ??
         payload?.team?.national ??
@@ -611,7 +612,7 @@ export class FixturesIngestionService {
       venueName: venuePayload?.name ?? payload?.venue_name ?? null,
       venueAddress: venuePayload?.address ?? payload?.venue_address ?? null,
       venueCity: venuePayload?.city ?? payload?.venue_city ?? null,
-      venueCapacity: this.toNumber(venuePayload?.capacity ?? payload?.venue_capacity),
+      venueCapacity: toNumber(venuePayload?.capacity ?? payload?.venue_capacity),
       venueSurface: venuePayload?.surface ?? payload?.venue_surface ?? null,
       venueImage: venuePayload?.image ?? payload?.venue_image ?? null,
       venue: venuePayload,
@@ -634,11 +635,11 @@ export class FixturesIngestionService {
 
     const rows = events.map((event) => ({
       fixtureId,
-      teamId: event?.team?.id ?? this.toNumber(event?.team_id) ?? null,
-      playerId: event?.player?.id ?? this.toNumber(event?.player_id) ?? null,
+      teamId: event?.team?.id ?? toNumber(event?.team_id) ?? null,
+      playerId: event?.player?.id ?? toNumber(event?.player_id) ?? null,
       assistPlayerId: event?.assist?.id ?? null,
-      minute: event?.time?.elapsed ?? this.toNumber(event?.minute) ?? null,
-      extra: event?.time?.extra ?? this.toNumber(event?.extra) ?? null,
+      minute: event?.time?.elapsed ?? toNumber(event?.minute) ?? null,
+      extra: event?.time?.extra ?? toNumber(event?.extra) ?? null,
       eventType: event?.type ?? null,
       detail: event?.detail ?? null,
       raw: event,
@@ -660,7 +661,7 @@ export class FixturesIngestionService {
     const snapshotAt = new Date();
     const rows = stats.map((entry) => ({
       fixtureId,
-      teamId: entry?.team?.id ?? this.toNumber(entry?.team_id) ?? null,
+      teamId: entry?.team?.id ?? toNumber(entry?.team_id) ?? null,
       half: null,
       elapsed,
       stats: entry,
@@ -684,7 +685,7 @@ export class FixturesIngestionService {
     const snapshotAt = new Date();
     const rows = lineups.map((lineup) => ({
       fixtureId,
-      teamId: lineup?.team?.id ?? this.toNumber(lineup?.team_id) ?? null,
+      teamId: lineup?.team?.id ?? toNumber(lineup?.team_id) ?? null,
       formation: lineup?.formation ?? null,
       coach: lineup?.coach ?? null,
       startXi: lineup?.startXI ?? lineup?.start_xi ?? null,
@@ -715,14 +716,14 @@ export class FixturesIngestionService {
     }> = [];
 
     for (const teamEntry of playersPayload) {
-      const teamId = teamEntry?.team?.id ?? this.toNumber(teamEntry?.team_id) ?? null;
+      const teamId = teamEntry?.team?.id ?? toNumber(teamEntry?.team_id) ?? null;
       const players = Array.isArray(teamEntry?.players) ? teamEntry.players : [];
 
       for (const player of players) {
         rows.push({
           fixtureId,
           teamId,
-          playerId: player?.player?.id ?? this.toNumber(player?.player_id) ?? null,
+          playerId: player?.player?.id ?? toNumber(player?.player_id) ?? null,
           stats: player,
           snapshotAt,
         });
@@ -763,15 +764,15 @@ export class FixturesIngestionService {
 
     return {
       providerFixtureId,
-      leagueId: payload?.league?.id ?? this.toNumber(payload?.league_id) ?? null,
+      leagueId: payload?.league?.id ?? toNumber(payload?.league_id) ?? null,
       leagueName:
         payload?.league?.name ??
         payload?.league?.league_name ??
         payload?.league_name ??
         null,
-      season: payload?.league?.season ?? this.toNumber(payload?.league_year) ?? null,
-      homeTeamId: payload?.teams?.home?.id ?? this.toNumber(payload?.match_hometeam_id) ?? null,
-      awayTeamId: payload?.teams?.away?.id ?? this.toNumber(payload?.match_awayteam_id) ?? null,
+      season: payload?.league?.season ?? toNumber(payload?.league_year) ?? null,
+      homeTeamId: payload?.teams?.home?.id ?? toNumber(payload?.match_hometeam_id) ?? null,
+      awayTeamId: payload?.teams?.away?.id ?? toNumber(payload?.match_awayteam_id) ?? null,
       homeTeamName:
         payload?.teams?.home?.name ??
         payload?.match_hometeam_name ??
@@ -790,27 +791,19 @@ export class FixturesIngestionService {
         null,
       statusShort: apiSportsFixture?.status?.short ?? this.normalizeApifootballStatus(payload?.match_status),
       statusLong: apiSportsFixture?.status?.long ?? payload?.match_status ?? null,
-      elapsed: apiSportsFixture?.status?.elapsed ?? this.toNumber(payload?.match_status) ?? null,
+      elapsed: apiSportsFixture?.status?.elapsed ?? toNumber(payload?.match_status) ?? null,
       matchDate: apiSportsFixture?.date ? new Date(apiSportsFixture.date) : this.toDate(payload?.match_date),
       scoreHome:
         payload?.goals?.home ??
-        this.toNumber(payload?.match_hometeam_score) ??
+        toNumber(payload?.match_hometeam_score) ??
         null,
       scoreAway:
         payload?.goals?.away ??
-        this.toNumber(payload?.match_awayteam_score) ??
+        toNumber(payload?.match_awayteam_score) ??
         null,
     };
   }
 
-  private toNumber(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') {
-      return null;
-    }
-
-    const parsed = Number(value);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
 
   private toDate(value: unknown): Date | null {
     if (!value || typeof value !== 'string') {
@@ -855,55 +848,7 @@ export class FixturesIngestionService {
     return rows.filter((row) => row.snapshotAt.getTime() === latestSnapshot);
   }
 
-  private computePressureIndex(statsPayload: Record<string, unknown> | null): number {
-    if (!statsPayload) {
-      return 0;
-    }
 
-    const attacks = this.getStatValue(statsPayload, ['Attacks']);
-    const dangerousAttacks = this.getStatValue(statsPayload, ['Dangerous Attacks']);
-    const onTarget = this.getStatValue(statsPayload, ['On Target']);
-    const offTarget = this.getStatValue(statsPayload, ['Off Target']);
-    const corners = this.getStatValue(statsPayload, ['Corner Kicks', 'Corners']);
-
-    return (
-      dangerousAttacks * 1.4 +
-      onTarget * 2 +
-      corners * 1.2 +
-      attacks * 0.15 -
-      offTarget * 0.4
-    );
-  }
-
-  private getStatValue(
-    statsPayload: Record<string, unknown>,
-    statNames: string[],
-  ): number {
-    const statistics = Array.isArray((statsPayload as { statistics?: unknown }).statistics)
-      ? ((statsPayload as { statistics: Array<{ type?: unknown; value?: unknown }> })
-          .statistics as Array<{ type?: unknown; value?: unknown }>)
-      : [];
-
-    for (const stat of statistics) {
-      const statType = typeof stat?.type === 'string' ? stat.type : null;
-      if (
-        statType &&
-        statNames.some((name) => name.toLowerCase() === statType.toLowerCase())
-      ) {
-        return this.toNumber(stat.value) ?? 0;
-      }
-    }
-
-    for (const statName of statNames) {
-      const legacyRaw = (statsPayload as Record<string, unknown>)[statName];
-      const legacyParsed = this.toNumber(legacyRaw);
-      if (legacyParsed !== null) {
-        return legacyParsed;
-      }
-    }
-
-    return 0;
-  }
 
   private buildCacheKey(scope: string, payload: unknown): string {
     return `${scope}:${JSON.stringify(payload)}`;

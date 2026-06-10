@@ -5,6 +5,7 @@ import { FixtureAnalytics } from '../database/entities/fixture-analytics.entity'
 import { FixtureEvent } from '../database/entities/fixture-event.entity';
 import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapshot.entity';
 import { Fixture } from '../database/entities/fixture.entity';
+import { toNumber, getStatValue, computePressureIndex } from '../common/utils/stats.utils';
 
 @Injectable()
 export class AnalyticsService {
@@ -57,48 +58,48 @@ export class AnalyticsService {
       score: { home: fixture.scoreHome, away: fixture.scoreAway },
       elapsed: fixture.elapsed,
       pressureIndex: {
-        home: this.computePressureIndex(homeStats?.stats ?? null),
-        away: this.computePressureIndex(awayStats?.stats ?? null),
+        home: computePressureIndex(homeStats?.stats ?? null),
+        away: computePressureIndex(awayStats?.stats ?? null),
       },
       possession: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Ball Possession', 'Possession']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Ball Possession', 'Possession']),
+        home: getStatValue(homeStats?.stats ?? null, ['Ball Possession', 'Possession']),
+        away: getStatValue(awayStats?.stats ?? null, ['Ball Possession', 'Possession']),
       },
       shots: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Total Shots', 'Shots']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Total Shots', 'Shots']),
+        home: getStatValue(homeStats?.stats ?? null, ['Total Shots', 'Shots']),
+        away: getStatValue(awayStats?.stats ?? null, ['Total Shots', 'Shots']),
       },
       onTarget: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['On Target', 'Shots on Goal']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['On Target', 'Shots on Goal']),
+        home: getStatValue(homeStats?.stats ?? null, ['On Target', 'Shots on Goal']),
+        away: getStatValue(awayStats?.stats ?? null, ['On Target', 'Shots on Goal']),
       },
       offTarget: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Off Target', 'Shots off Goal']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Off Target', 'Shots off Goal']),
+        home: getStatValue(homeStats?.stats ?? null, ['Off Target', 'Shots off Goal']),
+        away: getStatValue(awayStats?.stats ?? null, ['Off Target', 'Shots off Goal']),
       },
       corners: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Corner Kicks', 'Corners']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Corner Kicks', 'Corners']),
+        home: getStatValue(homeStats?.stats ?? null, ['Corner Kicks', 'Corners']),
+        away: getStatValue(awayStats?.stats ?? null, ['Corner Kicks', 'Corners']),
       },
       fouls: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Fouls']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Fouls']),
+        home: getStatValue(homeStats?.stats ?? null, ['Fouls']),
+        away: getStatValue(awayStats?.stats ?? null, ['Fouls']),
       },
       offsides: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Offsides']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Offsides']),
+        home: getStatValue(homeStats?.stats ?? null, ['Offsides']),
+        away: getStatValue(awayStats?.stats ?? null, ['Offsides']),
       },
       attacks: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Attacks']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Attacks']),
+        home: getStatValue(homeStats?.stats ?? null, ['Attacks']),
+        away: getStatValue(awayStats?.stats ?? null, ['Attacks']),
       },
       dangerousAttacks: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Dangerous Attacks']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Dangerous Attacks']),
+        home: getStatValue(homeStats?.stats ?? null, ['Dangerous Attacks']),
+        away: getStatValue(awayStats?.stats ?? null, ['Dangerous Attacks']),
       },
       expectedGoals: {
-        home: this.getStatValue(homeStats?.stats ?? null, ['Expected Goals', 'xG']),
-        away: this.getStatValue(awayStats?.stats ?? null, ['Expected Goals', 'xG']),
+        home: getStatValue(homeStats?.stats ?? null, ['Expected Goals', 'xG']),
+        away: getStatValue(awayStats?.stats ?? null, ['Expected Goals', 'xG']),
       },
       passes: {
         home: this.extractPasses(homeStats?.stats ?? null),
@@ -156,68 +157,8 @@ export class AnalyticsService {
     return { items: results, limit };
   }
 
-  private computePressureIndex(statsPayload: Record<string, unknown> | null): number {
-    if (!statsPayload) {
-      return 0;
-    }
 
-    const attacks = this.getStatValue(statsPayload, ['Attacks']);
-    const dangerousAttacks = this.getStatValue(statsPayload, ['Dangerous Attacks']);
-    const onTarget = this.getStatValue(statsPayload, ['On Target', 'Shots on Goal']);
-    const offTarget = this.getStatValue(statsPayload, ['Off Target', 'Shots off Goal']);
-    const corners = this.getStatValue(statsPayload, ['Corner Kicks', 'Corners']);
 
-    return (
-      dangerousAttacks * 1.4 +
-      onTarget * 2 +
-      corners * 1.2 +
-      attacks * 0.15 -
-      offTarget * 0.4
-    );
-  }
-
-  private getStatValue(
-    statsPayload: Record<string, unknown> | null,
-    statNames: string[],
-  ): number {
-    if (!statsPayload) {
-      return 0;
-    }
-
-    const statistics = Array.isArray((statsPayload as { statistics?: unknown }).statistics)
-      ? ((statsPayload as { statistics: Array<{ type?: unknown; value?: unknown }> })
-          .statistics as Array<{ type?: unknown; value?: unknown }>)
-      : [];
-
-    for (const stat of statistics) {
-      const statType = typeof stat?.type === 'string' ? stat.type : null;
-      if (
-        statType &&
-        statNames.some((name) => name.toLowerCase() === statType.toLowerCase())
-      ) {
-        return this.toNumber(stat.value) ?? 0;
-      }
-    }
-
-    for (const statName of statNames) {
-      const legacyRaw = (statsPayload as Record<string, unknown>)[statName];
-      const legacyParsed = this.toNumber(legacyRaw);
-      if (legacyParsed !== null) {
-        return legacyParsed;
-      }
-    }
-
-    return 0;
-  }
-
-  private toNumber(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') {
-      return null;
-    }
-
-    const parsed = Number(value);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
 
   private extractPasses(statsPayload: Record<string, unknown> | null): {
     total: number;
@@ -230,9 +171,9 @@ export class AnalyticsService {
 
     const legacyPasses = (statsPayload as Record<string, any>).passes;
     if (legacyPasses && typeof legacyPasses === 'object') {
-      const total = this.toNumber(legacyPasses.total) ?? 0;
-      const accurate = this.toNumber(legacyPasses.accurate) ?? 0;
-      const accuracy = this.toNumber(
+      const total = toNumber(legacyPasses.total) ?? 0;
+      const accurate = toNumber(legacyPasses.accurate) ?? 0;
+      const accuracy = toNumber(
         typeof legacyPasses.accuracy === 'string'
           ? legacyPasses.accuracy.replace('%', '')
           : legacyPasses.accuracy,
@@ -240,8 +181,8 @@ export class AnalyticsService {
       return { total, accurate, accuracy };
     }
 
-    const total = this.getStatValue(statsPayload, ['Total Passes', 'Passes']);
-    const accurate = this.getStatValue(statsPayload, ['Accurate Passes', 'Pass Accuracy']);
+    const total = getStatValue(statsPayload, ['Total Passes', 'Passes']);
+    const accurate = getStatValue(statsPayload, ['Accurate Passes', 'Pass Accuracy']);
     const accuracy = total > 0 ? Math.round((accurate / total) * 100) : 0;
     return { total, accurate, accuracy };
   }

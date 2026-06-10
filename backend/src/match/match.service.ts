@@ -70,11 +70,9 @@ export class MatchService {
       return matches.filter((match) => {
         const stats = match.statistics;
         const statsMiTemps = match.statistics_1half
-        let tempsJeux ;
-        if (match?.match_status !="Finished" && match?.match_status!="Half Time" ) {
-          tempsJeux = parseInt(match.match_status.split(':')[0],10)
-        }
-        tempsJeux = match.match_status;
+        const tempsJeux = (match?.match_status !== 'Finished' && match?.match_status !== 'Half Time')
+          ? parseInt(match.match_status.split(':')[0], 10)
+          : match.match_status;
         // Extraire les statistiques importantes pour tous le match
         const attacks = stats.find((s) => s.type === 'Attacks');
         const dangerousAttacks = stats.find((s) => s.type === 'Dangerous Attacks');

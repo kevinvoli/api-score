@@ -184,7 +184,7 @@ export class FixturesSyncScheduler implements OnModuleInit, OnModuleDestroy {
       { event: 'job_state_resumed' },
       'FixturesSyncScheduler',
     );
-    return false;
+    return true;
   }
 
   private async hasRateBudget(): Promise<boolean> {

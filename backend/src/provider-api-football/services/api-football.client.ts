@@ -571,6 +571,7 @@ export class ApiFootballClient {
       responseStatus: input.status,
       latencyMs: input.latencyMs,
       rateLimitRemaining: input.rateLimitRemaining,
+      calledAt: new Date(),
     });
   }
 
