@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUrl,
   Max,
   Min,
   MinLength,
@@ -116,6 +117,10 @@ class EnvironmentVariables {
   @Min(1)
   @Max(100)
   ALERT_QUOTA_REMAINING_MIN_PCT?: number = 10;
+
+  @IsOptional()
+  @IsUrl()
+  SLACK_ALERT_WEBHOOK_URL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

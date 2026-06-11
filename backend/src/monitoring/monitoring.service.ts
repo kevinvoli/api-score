@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import axios from 'axios';
 import { DataSource, MoreThanOrEqual, Repository } from 'typeorm';
+import { JsonLogger } from '../common/json.logger';
 import { ApiUsageLog } from '../database/entities/api-usage-log.entity';
 
 const HEALTH_CHECK_TIMEOUT_MS = 1500;
@@ -52,6 +54,7 @@ export class MonitoringService {
     @InjectRepository(ApiUsageLog)
     private readonly apiUsageLogRepository: Repository<ApiUsageLog>,
     private readonly configService: ConfigService,
+    private readonly logger: JsonLogger,
   ) {}
 
   async getHealth(): Promise<HealthCheckResult> {
@@ -183,12 +186,36 @@ export class MonitoringService {
     };
   }
 
-  // Stub: hook for future Slack/Email notifications
   private notifyAlerts(alerts: PipelineAlert[]): void {
+    const webhookUrl = this.configService.get<string>('SLACK_ALERT_WEBHOOK_URL');
+
     for (const alert of alerts) {
-      // TODO: integrate Slack/Email notifier here
-      // e.g. slackNotifier.send({ channel: '#alerts', text: alert.message });
-      void alert;
+      this.logger.error(
+        {
+          alert: true,
+          alertType: alert.type,
+          value: alert.value,
+          threshold: alert.threshold,
+        },
+        undefined,
+        'MonitoringService',
+      );
+
+      if (webhookUrl) {
+        const text = `[api-score] ALERT: ${alert.type} = ${alert.value} (seuil: ${alert.threshold})`;
+        axios
+          .post(webhookUrl, { text })
+          .catch((err: unknown) => {
+            this.logger.warn(
+              {
+                event: 'slack_alert_failed',
+                alertType: alert.type,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              'MonitoringService',
+            );
+          });
+      }
     }
   }
 

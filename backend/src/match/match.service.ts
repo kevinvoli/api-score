@@ -1,78 +1,39 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { CreateMatchDto } from './dto/create-match.dto';
-import { UpdateMatchDto } from './dto/update-match.dto';
+import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
 
 @Injectable()
 export class MatchService {
-  constructor(private readonly configService: ConfigService) {}
-  
+  constructor(private readonly apiFootballClient: ApiFootballClient) {}
+
   create(createMatchDto: CreateMatchDto) {
     return 'This action adds a new match';
   }
-    async  fetchLiveMatches(): Promise<any[]> {
-      const apiKey = this.configService.get<string>('API_FOOTBALL_KEY');
-      const baseUrl =
-        this.configService.get<string>('API_FOOTBALL_BASE_URL') ??
-        'https://apiv3.apifootball.com';
 
-      if (!apiKey) {
-        throw new Error('Missing API_FOOTBALL_KEY');
-      }
+  async fetchLiveMatches(): Promise<Record<string, unknown>[]> {
+    const matches = await this.apiFootballClient.fetchLiveFixtures();
 
-      const url= `${baseUrl}/?action=get_events&APIkey=${apiKey}&match_live=1`
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
-    
-      try {
-        const response = await fetch(url, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          signal: controller.signal,
-        });
-    
-        if (!response.ok) {
-          throw new Error(`Erreur HTTP : ${response.status} ${response.statusText}`);
-        }
-    
-        
-        const matches = await response.json();
-        // console.log(matches);
-        
-        // Vérifie que les données sont un tableau
-        if (!Array.isArray(matches)) {
-          throw new Error("Les données reçues ne sont pas un tableau de matchs.");
-        }
-    
-        // Filtre les matchs qui ont des statistiques
-        const validMatches = matches.filter((match: any) => {
-          return Array.isArray(match?.statistics) && match?.statistics.length > 0 && match?.match_status !=="Finished";
-        });
-    
-        return validMatches;
-      } catch (error) {
-        if (error.name === "AbortError") {
-          console.error("La requête a expiré (timeout).");
-        } else {
-          console.error(`Erreur lors de l'appel API : ${error.message}`);
-        }
-        throw error;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
+    return matches.filter((match: Record<string, unknown>) => {
+      return (
+        Array.isArray(match?.statistics) &&
+        (match.statistics as unknown[]).length > 0 &&
+        match?.match_status !== 'Finished'
+      );
+    });
+  }
     
 
   
-    filterMatches(matches: any[]): any[] {
+    filterMatches(matches: Record<string, unknown>[]): Record<string, unknown>[] {
+      type StatEntry = { type: string; home: string; away: string };
+
       return matches.filter((match) => {
-        const stats = match.statistics;
-        const statsMiTemps = match.statistics_1half
-        const tempsJeux = (match?.match_status !== 'Finished' && match?.match_status !== 'Half Time')
-          ? parseInt(match.match_status.split(':')[0], 10)
-          : match.match_status;
+        const stats = match.statistics as StatEntry[];
+        const statsMiTemps = match.statistics_1half as StatEntry[];
+        const matchStatus = match?.match_status as string;
+        const tempsJeux = (matchStatus !== 'Finished' && matchStatus !== 'Half Time')
+          ? parseInt(matchStatus.split(':')[0], 10)
+          : matchStatus;
         // Extraire les statistiques importantes pour tous le match
         const attacks = stats.find((s) => s.type === 'Attacks');
         const dangerousAttacks = stats.find((s) => s.type === 'Dangerous Attacks');
@@ -136,73 +97,73 @@ export class MatchService {
 
 
         // Définir les critères pour chaque mi-temps, divisés en 2 parties de 22 minutes
-        const evaluatePhase = (tempsDeJeux, attacks: number, dangerousAttacks: number, onTarget: number,offTarget:number, shotsTotal: number, shotsInsideBox: number, corners: number, possession: number) => {
+        const evaluatePhase = (tempsDeJeux: number | string, attacks: number, dangerousAttacks: number, onTarget: number,offTarget:number, shotsTotal: number, shotsInsideBox: number, corners: number, possession: number) => {
           const tir = onTarget+ offTarget
-          
+
           if (tempsDeJeux !="Finished" && tempsDeJeux!="Half Time" ) {
-            
-            if (tempsDeJeux > 0 && tempsDeJeux <= 10) {
+            const tempsNum = tempsDeJeux as number;
+            if (tempsNum > 0 && tempsNum <= 10) {
               return (
                 attacks > 5 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.3 &&  // au moins 40% des attaques sont dangereuse
                 onTarget >=0 &&  // au moins 2 tirs cadrés
                   tir >=4
               );
-            } else if (tempsDeJeux > 10 && tempsDeJeux < 16) {
-              
+            } else if (tempsNum > 10 && tempsNum < 16) {
+
               return (
                 attacks > 6 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.3 &&  // au moins 40% des attaques sont dangereuses
                 onTarget >= 2 &&  // au moins 2 tirs cadrés
                 tir >=5
               );
-            }  else if (tempsDeJeux > 16 && tempsDeJeux < 23) {
-              
+            }  else if (tempsNum > 16 && tempsNum < 23) {
+
               return (
                 attacks > 15 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                 onTarget >= 2 &&  // au moins 2 tirs cadrés
                 tir >=7
               );
-            } else if (tempsDeJeux > 23 && tempsDeJeux < 35) {
-              
+            } else if (tempsNum > 23 && tempsNum < 35) {
+
               return (
                 attacks > 20 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                 onTarget >= 3 &&  // au moins 2 tirs cadrés
                 tir >=8
               );
-            }else if (tempsDeJeux > 35 && tempsDeJeux < 45) {
-            
-              
+            }else if (tempsNum > 35 && tempsNum < 45) {
+
+
               return (
                 attacks > 30 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                 onTarget >= 4 &&  // au moins 2 tirs cadrés
                 tir >=10
               );
-            } else if (tempsDeJeux > 45 && tempsDeJeux < 55){
+            } else if (tempsNum > 45 && tempsNum < 55){
               return (
                 attacks > 40 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                 onTarget >= 4 && // au moins 2 tirs cadrés
                 tir>13
               );
-            }else if (tempsDeJeux > 55 && tempsDeJeux < 66){
+            }else if (tempsNum > 55 && tempsNum < 66){
               return (
                 attacks > 40 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                 onTarget >= 4 && // au moins 2 tirs cadrés
                 tir>15
               );
-            }else if (tempsDeJeux > 66 && tempsDeJeux < 78){
+            }else if (tempsNum > 66 && tempsNum < 78){
               return (
                 attacks > 50 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses
                 onTarget >= 5 && // au moins 2 tirs cadrés
                 tir>17
               );
-            } else if (tempsDeJeux > 78 && tempsDeJeux < 90) {
+            } else if (tempsNum > 78 && tempsNum < 90) {
               return (
                 attacks > 70 &&  // minimum 10 attaques
                 dangerousAttacks >= attacks * 0.4 &&  // au moins 40% des attaques sont dangereuses

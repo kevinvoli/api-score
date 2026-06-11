@@ -1,14 +1,11 @@
 ﻿import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { live } from './schemat/livedata';
 
 @Injectable()
 export class AppService {
   constructor(private readonly configService: ConfigService) {}
 
-  private readonly datas = live;
-
-    async getLives() {
+  async getLives() {
     const apiKey = this.configService.get<string>('API_FOOTBALL_KEY');
     const baseUrl =
       this.configService.get<string>('API_FOOTBALL_BASE_URL') ??
@@ -28,8 +25,6 @@ export class AppService {
         },
       });
 
-      console.log("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", response);
-      
       if (!response.ok) {
         throw new Error(`Erreur HTTP : ${response.status}`);
       }
@@ -38,26 +33,8 @@ export class AppService {
       const result = data.filter((match) => match.statistics.length > 1);
       return result;
     } catch (error) {
-      console.log("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", error);
       console.error("Erreur lors de l'appel API :", error.message);
     }
-  }
-  async teste(){
-    console.log('un live:', this.datas[1]);
-    const affiche= [] 
-    await this.datas.forEach(element => {
-      affiche.push({
-        temps_de_jeux : element.match_status,
-        equipe1 : element.match_hometeam_name,
-        equipe2: element.match_awayteam_name,
-        scrore: `${element.match_hometeam_score} : ${element.match_awayteam_score}`,
-        statistic : element.statistics
-      }) 
-    });
-    
-    console.log('les live:', affiche);
-    
-    return affiche
   }
 
   filterMatches(matches: any[]): any[] {

@@ -155,21 +155,20 @@ export class SmartSuggestionsService {
   private async saveCoupons(suggestions: SmartSuggestion[]): Promise<void> {
     if (!suggestions.length) return;
 
-    for (const s of suggestions) {
-      // Éviter les doublons : un seul coupon PENDING par (fixtureId, teamId, marketType)
-      const existing = await this.couponRepo.findOne({
-        where: {
-          fixtureId:  s.fixtureId,
-          teamId:     s.teamId ?? undefined,
-          marketType: s.marketType,
-          status:     'PENDING',
-        },
-      });
-      if (existing) continue;
+    const fixtureIds = [...new Set(suggestions.map(s => s.fixtureId))];
+    const existingPending = (await this.couponRepo.findBy({
+      fixtureId: In(fixtureIds),
+      status: 'PENDING',
+    })) ?? [];
+    const existingKeys = new Set(
+      existingPending.map(c => `${c.fixtureId}|${c.teamId ?? ''}|${c.marketType}`),
+    );
 
-      const [home, away] = s.fixtureLabel.split(' vs ');
-      await this.couponRepo.save(
-        this.couponRepo.create({
+    const toInsert = suggestions
+      .filter(s => !existingKeys.has(`${s.fixtureId}|${s.teamId ?? ''}|${s.marketType}`))
+      .map(s => {
+        const [home, away] = s.fixtureLabel.split(' vs ');
+        return this.couponRepo.create({
           fixtureId:           s.fixtureId,
           homeTeamName:        home?.trim() ?? null,
           awayTeamName:        away?.trim() ?? null,
@@ -188,9 +187,10 @@ export class SmartSuggestionsService {
           shotsCount:          s.shotsCount,
           status:              'PENDING',
           resolvedAt:          null,
-        }),
-      );
-    }
+        });
+      });
+
+    if (toInsert.length) await this.couponRepo.save(toInsert);
   }
 
   // ── Résolution automatique ────────────────────────────────────
