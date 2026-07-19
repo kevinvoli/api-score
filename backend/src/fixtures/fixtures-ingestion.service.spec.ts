@@ -69,7 +69,9 @@ function makeFixture(overrides: Partial<Fixture> = {}): Fixture {
   } as Fixture;
 }
 
-function makeStatsSnapshot(overrides: Partial<FixtureStatsSnapshot> = {}): FixtureStatsSnapshot {
+function makeStatsSnapshot(
+  overrides: Partial<FixtureStatsSnapshot> = {},
+): FixtureStatsSnapshot {
   const now = new Date();
   return {
     id: 'snap-uuid-1',
@@ -104,42 +106,56 @@ describe('FixturesIngestionService', () => {
 
   function buildModule(ttlMs: number): Promise<TestingModule> {
     configService = {
-      get: jest.fn().mockImplementation((key: string, defaultVal?: number) =>
-        key === 'LIVE_READ_CACHE_TTL_MS' ? ttlMs : defaultVal,
-      ),
+      get: jest
+        .fn()
+        .mockImplementation((key: string, defaultVal?: number) =>
+          key === 'LIVE_READ_CACHE_TTL_MS' ? ttlMs : defaultVal,
+        ),
     };
 
     apiClient = {
-      fetchLiveFixtures:        jest.fn().mockResolvedValue([]),
-      fetchFixtureEvents:       jest.fn().mockResolvedValue([]),
-      fetchFixtureStatistics:   jest.fn().mockResolvedValue([]),
-      fetchFixtureLineups:      jest.fn().mockResolvedValue([]),
-      fetchFixturePlayers:      jest.fn().mockResolvedValue([]),
-      fetchTeamsByLeague:       jest.fn().mockResolvedValue([]),
-      fetchTeamById:            jest.fn().mockResolvedValue(null),
+      fetchLiveFixtures: jest.fn().mockResolvedValue([]),
+      fetchFixtureEvents: jest.fn().mockResolvedValue([]),
+      fetchFixtureStatistics: jest.fn().mockResolvedValue([]),
+      fetchFixtureLineups: jest.fn().mockResolvedValue([]),
+      fetchFixturePlayers: jest.fn().mockResolvedValue([]),
+      fetchTeamsByLeague: jest.fn().mockResolvedValue([]),
+      fetchTeamById: jest.fn().mockResolvedValue(null),
     };
 
     logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
-    fixtureRepo       = mockRepository();
-    fixtureEventRepo  = mockRepository();
+    fixtureRepo = mockRepository();
+    fixtureEventRepo = mockRepository();
     fixtureLineupRepo = mockRepository();
     fixturePlayerRepo = mockRepository();
-    fixtureStatsRepo  = mockRepository();
-    teamRepo          = mockRepository();
+    fixtureStatsRepo = mockRepository();
+    teamRepo = mockRepository();
 
     return Test.createTestingModule({
       providers: [
         FixturesIngestionService,
-        { provide: ConfigService,                                       useValue: configService },
-        { provide: ApiFootballClient,                                   useValue: apiClient },
-        { provide: JsonLogger,                                          useValue: logger },
-        { provide: getRepositoryToken(Fixture),                        useValue: fixtureRepo },
-        { provide: getRepositoryToken(FixtureEvent),                   useValue: fixtureEventRepo },
-        { provide: getRepositoryToken(FixtureLineup),                  useValue: fixtureLineupRepo },
-        { provide: getRepositoryToken(FixturePlayerStatsSnapshot),     useValue: fixturePlayerRepo },
-        { provide: getRepositoryToken(FixtureStatsSnapshot),           useValue: fixtureStatsRepo },
-        { provide: getRepositoryToken(Team),                           useValue: teamRepo },
+        { provide: ConfigService, useValue: configService },
+        { provide: ApiFootballClient, useValue: apiClient },
+        { provide: JsonLogger, useValue: logger },
+        { provide: getRepositoryToken(Fixture), useValue: fixtureRepo },
+        {
+          provide: getRepositoryToken(FixtureEvent),
+          useValue: fixtureEventRepo,
+        },
+        {
+          provide: getRepositoryToken(FixtureLineup),
+          useValue: fixtureLineupRepo,
+        },
+        {
+          provide: getRepositoryToken(FixturePlayerStatsSnapshot),
+          useValue: fixturePlayerRepo,
+        },
+        {
+          provide: getRepositoryToken(FixtureStatsSnapshot),
+          useValue: fixtureStatsRepo,
+        },
+        { provide: getRepositoryToken(Team), useValue: teamRepo },
       ],
     }).compile();
   }
@@ -160,10 +176,10 @@ describe('FixturesIngestionService', () => {
       const stats = {
         statistics: [
           { type: 'Dangerous Attacks', value: 10 },
-          { type: 'On Target',         value: 5 },
-          { type: 'Corner Kicks',      value: 3 },
-          { type: 'Attacks',           value: 20 },
-          { type: 'Off Target',        value: 4 },
+          { type: 'On Target', value: 5 },
+          { type: 'Corner Kicks', value: 3 },
+          { type: 'Attacks', value: 20 },
+          { type: 'Off Target', value: 4 },
         ],
       };
       // 10*1.4 + 5*2 + 3*1.2 + 20*0.15 - 4*0.4
@@ -173,9 +189,7 @@ describe('FixturesIngestionService', () => {
 
     it('utilise "Shots on Goal" comme alias de "On Target"', () => {
       const stats = {
-        statistics: [
-          { type: 'Shots on Goal', value: 4 },
-        ],
+        statistics: [{ type: 'Shots on Goal', value: 4 }],
       };
       // 4*2 = 8
       expect(computePressureIndex(stats)).toBe(8);
@@ -183,9 +197,7 @@ describe('FixturesIngestionService', () => {
 
     it('utilise "Corners" comme alias de "Corner Kicks"', () => {
       const stats = {
-        statistics: [
-          { type: 'Corners', value: 5 },
-        ],
+        statistics: [{ type: 'Corners', value: 5 }],
       };
       // 5*1.2 = 6
       expect(computePressureIndex(stats)).toBe(6);
@@ -197,9 +209,7 @@ describe('FixturesIngestionService', () => {
 
     it('soustrait correctement les tirs non cadrés', () => {
       const stats = {
-        statistics: [
-          { type: 'Off Target', value: 10 },
-        ],
+        statistics: [{ type: 'Off Target', value: 10 }],
       };
       // -10*0.4 = -4, mais max(0, ...) n'est pas dans computePressureIndex → résultat négatif possible
       expect(computePressureIndex(stats)).toBe(-4);
@@ -218,9 +228,7 @@ describe('FixturesIngestionService', () => {
         teamId: fixture.homeTeamId ?? 10,
         snapshotAt: now,
         stats: {
-          statistics: [
-            { type: 'Total Shots', value: 5 },
-          ],
+          statistics: [{ type: 'Total Shots', value: 5 }],
         },
       });
 
@@ -236,8 +244,11 @@ describe('FixturesIngestionService', () => {
       const result = await service.getFixtureSummary(99999);
 
       expect(result).not.toBeNull();
-      expect(typeof (result as Record<string, unknown>).confidence).toBe('number');
-      const confidence = (result as Record<string, unknown>).confidence as number;
+      expect(typeof (result as Record<string, unknown>).confidence).toBe(
+        'number',
+      );
+      const confidence = (result as Record<string, unknown>)
+        .confidence as number;
       expect(confidence).toBeGreaterThanOrEqual(0);
       expect(confidence).toBeLessThanOrEqual(100);
     });
@@ -252,9 +263,12 @@ describe('FixturesIngestionService', () => {
       fixturePlayerRepo.find.mockResolvedValue([]);
       fixtureEventRepo.find.mockResolvedValue([]);
 
-      const result = await service.getFixtureSummary(99999) as Record<string, unknown>;
+      const result = (await service.getFixtureSummary(99999)) as Record<
+        string,
+        unknown
+      >;
 
-      expect((result.confidence as number)).toBeLessThanOrEqual(20);
+      expect(result.confidence as number).toBeLessThanOrEqual(20);
     });
 
     it('retourne null si la fixture est introuvable', async () => {
@@ -268,7 +282,10 @@ describe('FixturesIngestionService', () => {
     it('contient les champs momentum et dataQuality dans la réponse', async () => {
       setupSummaryMocks();
 
-      const result = await service.getFixtureSummary(99999) as Record<string, unknown>;
+      const result = (await service.getFixtureSummary(99999)) as Record<
+        string,
+        unknown
+      >;
 
       expect(result).toHaveProperty('momentum');
       expect(result).toHaveProperty('dataQuality');
@@ -311,7 +328,6 @@ describe('FixturesIngestionService', () => {
 
     it('ne rappelle pas findOne si la clé est en cache (getFixtureLineups)', async () => {
       const fixture = makeFixture();
-      const now = new Date();
       fixtureRepo.findOne.mockResolvedValue(fixture);
       fixtureLineupRepo.find.mockResolvedValue([]);
 
@@ -362,7 +378,10 @@ describe('FixturesIngestionService', () => {
 
   describe('getFixturesHistory()', () => {
     it('retourne items et limit avec les valeurs par défaut', async () => {
-      const fixtures = [makeFixture(), makeFixture({ id: 'fixture-2', providerFixtureId: '2' })];
+      const fixtures = [
+        makeFixture(),
+        makeFixture({ id: 'fixture-2', providerFixtureId: '2' }),
+      ];
       fixtureRepo.find.mockResolvedValue(fixtures);
 
       const result = await service.getFixturesHistory({});
@@ -387,7 +406,7 @@ describe('FixturesIngestionService', () => {
   // ── Détection N+1 ─────────────────────────────────────────
 
   describe('performance — pas de N+1', () => {
-    it('ne fait qu\'un seul appel find pour récupérer les events d\'une fixture', async () => {
+    it("ne fait qu'un seul appel find pour récupérer les events d'une fixture", async () => {
       const fixture = makeFixture();
       fixtureRepo.findOne.mockResolvedValue(fixture);
       fixtureEventRepo.find.mockResolvedValue([]);
@@ -395,6 +414,40 @@ describe('FixturesIngestionService', () => {
       await service.getFixtureEvents(99999);
 
       expect(fixtureEventRepo.find).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('normalizeApifootballStatus()', () => {
+    const norm = (raw: string | null | undefined) =>
+      (
+        service as unknown as {
+          normalizeApifootballStatus: (
+            r: string | null | undefined,
+          ) => string | null;
+        }
+      ).normalizeApifootballStatus(raw);
+
+    it('mappe les libellés terminaux vers les codes attendus par la résolution', () => {
+      // Sans ces deux mappings, la branche LOST de resolveCouponOutcome est
+      // inatteignable et le taux de réussite des coupons vaut toujours 100 %.
+      expect(norm('Finished')).toBe('FT');
+      expect(norm('Half Time')).toBe('HT');
+    });
+
+    it('normalise les minutes, y compris le temps additionnel sans chiffre', () => {
+      expect(norm('75')).toBe('LIVE');
+      expect(norm('45+2')).toBe('LIVE');
+      expect(norm('90+')).toBe('LIVE');
+      expect(norm('45+')).toBe('LIVE');
+    });
+
+    it('conserve les autres conventions existantes', () => {
+      expect(norm('')).toBe('NS');
+      expect(norm('Cancelled')).toBe('CANC');
+      expect(norm('Interrupted')).toBe('INT');
+      expect(norm('Pen.')).toBe('PEN');
+      expect(norm(null)).toBeNull();
+      expect(norm('FT')).toBe('FT');
     });
   });
 });
