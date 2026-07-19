@@ -17,6 +17,8 @@ export type LiveFixture = {
   scoreHome: number | null;
   scoreAway: number | null;
   lastSyncedAt: string | null;
+  /** Calculé par le backend : dernière sync > 120 s (match figé si statut live). */
+  isStale?: boolean;
   raw?: Record<string, unknown>;
   confidence?: number;
 };

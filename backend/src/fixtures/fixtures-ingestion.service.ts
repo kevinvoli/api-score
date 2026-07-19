@@ -134,12 +134,15 @@ export class FixturesIngestionService {
     };
   }
 
-  async getLatestFixtures(
-    query: GetLiveFixturesQueryDto,
-  ): Promise<{ items: Fixture[]; page: number; limit: number; total: number }> {
+  async getLatestFixtures(query: GetLiveFixturesQueryDto): Promise<{
+    items: (Fixture & { isStale: boolean })[];
+    page: number;
+    limit: number;
+    total: number;
+  }> {
     const cacheKey = this.buildCacheKey('fixtures:list', query);
     const cached = this.getFromCache<{
-      items: Fixture[];
+      items: (Fixture & { isStale: boolean })[];
       page: number;
       limit: number;
       total: number;
@@ -188,7 +191,18 @@ export class FixturesIngestionService {
     qb.skip((page - 1) * limit);
     qb.take(limit);
 
-    const [items, total] = await qb.getManyAndCount();
+    const [rows, total] = await qb.getManyAndCount();
+
+    // Même convention de fraîcheur que le summary (isStale à 120 s) : un match
+    // en statut live jamais re-synchronisé (sync interrompue avant sa fin)
+    // resterait « en direct » pour toujours côté consommateurs.
+    const items = rows.map((fixture) => ({
+      ...fixture,
+      isStale:
+        fixture.lastSyncedAt instanceof Date
+          ? Date.now() - fixture.lastSyncedAt.getTime() > 120_000
+          : true,
+    }));
 
     const result = { items, page, limit, total };
     this.setCache(cacheKey, result);

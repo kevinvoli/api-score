@@ -278,6 +278,12 @@ export class SmartSuggestionsService {
       .andWhere('f.elapsed IS NOT NULL')
       .andWhere('f.elapsed >= 1')
       .andWhere('f.elapsed < :max', { max: maxWindow })
+      // Fraîcheur (même convention que isStale, 120 s) : une fixture figée en
+      // statut live par une sync interrompue générerait des suggestions — et
+      // donc des coupons — sur un match en réalité terminé depuis longtemps.
+      .andWhere('f.lastSyncedAt >= :freshAfter', {
+        freshAfter: new Date(Date.now() - 120_000),
+      })
       .getMany();
 
     return this.evaluateFixturesWithRules(fixtures, config, liveOdds, 'fh');
@@ -297,6 +303,9 @@ export class SmartSuggestionsService {
       .andWhere('f.elapsed IS NOT NULL')
       .andWhere('f.elapsed >= 45')
       .andWhere('f.elapsed < :max', { max: rule.maxElapsed })
+      .andWhere('f.lastSyncedAt >= :freshAfter', {
+        freshAfter: new Date(Date.now() - 120_000),
+      })
       .getMany();
 
     if (!fixtures.length) return [];

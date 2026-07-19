@@ -29,6 +29,13 @@ function isLiveStatus(s: string | null | undefined): boolean {
   return /^\d+(\+\d+)?$/.test(s); // "75", "45+2", etc.
 }
 
+// « En direct » exige un statut live ET des données fraîches : une fixture
+// jamais re-synchronisée (sync interrompue avant la fin du match) reste figée
+// en statut live pour toujours — l'afficher en direct serait mensonger.
+function isActuallyLive(f: LiveFixture): boolean {
+  return isLiveStatus(f.statusShort) && f.isStale !== true;
+}
+
 const FILTER_EMPTY_LABELS: Record<StatusFilter, string> = {
   all:      'Aucun match disponible.',
   live:     'Aucun match en direct pour le moment.',
@@ -65,23 +72,27 @@ export default function LivePage() {
 
   const counts = useMemo<Record<StatusFilter, number>>(() => ({
     all:      fixtures.length,
-    live:     fixtures.filter((f) => isLiveStatus(f.statusShort)).length,
+    live:     fixtures.filter(isActuallyLive).length,
     upcoming: fixtures.filter((f) => STATUS_GROUPS.upcoming.has(f.statusShort ?? '')).length,
     finished: fixtures.filter((f) => STATUS_GROUPS.finished.has(f.statusShort ?? '')).length,
   }), [fixtures]);
 
   const filteredFixtures = useMemo<LiveFixture[]>(() => {
     if (statusFilter === 'all') return fixtures;
-    if (statusFilter === 'live') return fixtures.filter((f) => isLiveStatus(f.statusShort));
+    if (statusFilter === 'live') return fixtures.filter(isActuallyLive);
     return fixtures.filter((f) => STATUS_GROUPS[statusFilter].has(f.statusShort ?? ''));
   }, [fixtures, statusFilter]);
 
   const leagueGroups = useMemo(() => {
-    const map = new Map<number, { leagueName: string; fixtures: LiveFixture[] }>();
+    const map = new Map<
+      number,
+      { leagueId: number; leagueName: string; fixtures: LiveFixture[] }
+    >();
     for (const f of filteredFixtures) {
       const key = f.leagueId ?? 0;
       if (!map.has(key)) {
         map.set(key, {
+          leagueId: key,
           leagueName: f.leagueName ?? `Championnat ${key}`,
           fixtures: [],
         });
@@ -204,7 +215,7 @@ export default function LivePage() {
           <div className="live-groups">
             {leagueGroups.map((group) => (
               <LeagueGroup
-                key={group.leagueName}
+                key={group.leagueId}
                 leagueName={group.leagueName}
                 fixtures={group.fixtures}
                 onAnalyze={setActiveFixture}
