@@ -1,4 +1,11 @@
-import { Controller, Get, Param, ParseIntPipe, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { GetLiveRecommendationsQueryDto } from './dto/get-live-recommendations-query.dto';
 import { RecommendationsService } from './recommendations.service';
 import { SmartSuggestionsService } from './smart-suggestions.service';
@@ -30,11 +37,11 @@ export class RecommendationsController {
   /** Historique paginé des coupons (PENDING / WON / LOST) */
   @Get('coupons')
   getCouponHistory(
-    @Query('limit')  limit?: string,
+    @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
     return this.smartSuggestionsService.getCouponHistory(
-      limit  ? Number(limit)  : 50,
+      limit ? Number(limit) : 50,
       offset ? Number(offset) : 0,
     );
   }

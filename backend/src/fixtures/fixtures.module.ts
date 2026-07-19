@@ -40,7 +40,11 @@ import { ProviderPersistenceService } from './provider-persistence.service';
     ]),
   ],
   controllers: [FixturesController, ProviderController],
-  providers: [FixturesIngestionService, FixturesSyncScheduler, ProviderPersistenceService],
+  providers: [
+    FixturesIngestionService,
+    FixturesSyncScheduler,
+    ProviderPersistenceService,
+  ],
   exports: [FixturesIngestionService],
 })
 export class FixturesModule {}

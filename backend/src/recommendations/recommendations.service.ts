@@ -11,9 +11,12 @@ export class RecommendationsService {
     private readonly recommendationsRepository: Repository<BetRecommendation>,
   ) {}
 
-  async getLiveRecommendations(
-    query: GetLiveRecommendationsQueryDto,
-  ): Promise<{ items: BetRecommendation[]; page: number; limit: number; total: number }> {
+  async getLiveRecommendations(query: GetLiveRecommendationsQueryDto): Promise<{
+    items: BetRecommendation[];
+    page: number;
+    limit: number;
+    total: number;
+  }> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 

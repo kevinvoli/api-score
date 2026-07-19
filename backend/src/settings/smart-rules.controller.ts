@@ -1,5 +1,8 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
-import { SmartRulesConfigService, SmartRulesConfig } from './smart-rules-config.service';
+import {
+  SmartRulesConfigService,
+  SmartRulesConfig,
+} from './smart-rules-config.service';
 import { UpdateSmartRulesDto } from './dto/update-smart-rules.dto';
 
 @Controller('settings/smart-rules')

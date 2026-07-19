@@ -2,26 +2,6 @@ import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { ApiKeyGuard } from './api-key.guard';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-
-function makeContext(headerValue: string | undefined, isPublic = false): ExecutionContext {
-  const reflector = {
-    getAllAndOverride: jest.fn().mockReturnValue(isPublic),
-  } as unknown as Reflector;
-
-  const request = {
-    headers: headerValue !== undefined ? { 'x-api-key': headerValue } : {},
-  };
-
-  return {
-    getHandler: jest.fn(),
-    getClass: jest.fn(),
-    switchToHttp: () => ({
-      getRequest: () => request,
-    }),
-    _reflector: reflector,
-  } as unknown as ExecutionContext;
-}
 
 describe('ApiKeyGuard', () => {
   const API_KEY = 'supersecretapikey123456';

@@ -18,7 +18,9 @@ export class FixtureEvent {
   @Column({ type: 'uuid' })
   fixtureId: string;
 
-  @ManyToOne(() => Fixture, (fixture) => fixture.events, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Fixture, (fixture) => fixture.events, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'fixtureId' })
   fixture: Fixture;
 
@@ -49,4 +51,3 @@ export class FixtureEvent {
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 }
-

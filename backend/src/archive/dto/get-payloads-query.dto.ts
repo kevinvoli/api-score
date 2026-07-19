@@ -1,6 +1,6 @@
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString } from 'class-validator';
 
 export class GetPayloadsQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -28,6 +28,4 @@ export class GetPayloadsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   to?: string;
-
-
 }

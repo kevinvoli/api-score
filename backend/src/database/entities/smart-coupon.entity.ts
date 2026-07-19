@@ -10,7 +10,11 @@ import {
 export type SmartCouponStatus = 'PENDING' | 'WON' | 'LOST';
 
 @Entity('smart_coupons')
-@Index('idx_smart_coupons_fixture_team_market', ['fixtureId', 'teamId', 'marketType'])
+@Index('idx_smart_coupons_fixture_team_market', [
+  'fixtureId',
+  'teamId',
+  'marketType',
+])
 @Index('idx_smart_coupons_status', ['status'])
 export class SmartCoupon {
   @PrimaryGeneratedColumn('uuid')

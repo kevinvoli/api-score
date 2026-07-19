@@ -6,10 +6,9 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
-  async getLives(){
-    const result =  await this.appService.getLives()
-   
+  async getLives() {
+    const result = await this.appService.getLives();
+
     return result;
-    
   }
 }

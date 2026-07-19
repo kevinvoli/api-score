@@ -11,7 +11,9 @@ import { FixtureEvent } from './fixture-event.entity';
 import { FixtureStatsSnapshot } from './fixture-stats-snapshot.entity';
 
 @Entity('fixtures')
-@Index('idx_fixtures_provider_fixture_id', ['providerFixtureId'], { unique: true })
+@Index('idx_fixtures_provider_fixture_id', ['providerFixtureId'], {
+  unique: true,
+})
 @Index('idx_fixtures_last_synced_at', ['lastSyncedAt'])
 export class Fixture {
   @PrimaryGeneratedColumn('uuid')
@@ -83,4 +85,3 @@ export class Fixture {
   @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
 }
-

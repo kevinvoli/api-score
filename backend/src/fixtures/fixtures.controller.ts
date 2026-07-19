@@ -1,4 +1,11 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { GetFixturesHistoryQueryDto } from './dto/get-fixtures-history-query.dto';
 import { GetLiveFixturesQueryDto } from './dto/get-live-fixtures-query.dto';
 import { FixturesIngestionService } from './fixtures-ingestion.service';
@@ -16,11 +23,13 @@ export class FixturesController {
     const result = await this.fixturesIngestionService.syncLiveFixtures();
     // Génère les nouvelles suggestions ET résout les coupons PENDING
     // (buts marqués en live + matchs terminés → WON/LOST)
-    await this.smartSuggestionsService.evaluateAndSave().catch((err: unknown) => {
-      // evaluateAndSave appelle toujours resolveSettledCoupons en finally,
-      // donc la résolution s'est exécutée même si la génération a échoué.
-      void err;
-    });
+    await this.smartSuggestionsService
+      .evaluateAndSave()
+      .catch((err: unknown) => {
+        // evaluateAndSave appelle toujours resolveSettledCoupons en finally,
+        // donc la résolution s'est exécutée même si la génération a échoué.
+        void err;
+      });
     return result;
   }
 

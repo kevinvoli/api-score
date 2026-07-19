@@ -47,7 +47,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
   ): { code: string; message: string; details: unknown; traceId: string } {
     if (exception instanceof HttpException) {
       const exceptionResponse = exception.getResponse();
-      const { message, details } = this.extractExceptionDetails(exceptionResponse);
+      const { message, details } =
+        this.extractExceptionDetails(exceptionResponse);
 
       return {
         code: this.toErrorCode(status),
@@ -86,8 +87,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const message = Array.isArray(rawMessage)
       ? 'Validation failed'
       : typeof rawMessage === 'string'
-      ? rawMessage
-      : 'Request failed';
+        ? rawMessage
+        : 'Request failed';
 
     const details = Array.isArray(rawMessage)
       ? rawMessage

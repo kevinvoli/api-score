@@ -12,12 +12,17 @@ import { SmartSuggestionsService } from './smart-suggestions.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BetRecommendation, Fixture, FixtureStatsSnapshot, SmartCoupon]),
+    TypeOrmModule.forFeature([
+      BetRecommendation,
+      Fixture,
+      FixtureStatsSnapshot,
+      SmartCoupon,
+    ]),
     ProviderApiFootballModule,
     SettingsModule,
   ],
   controllers: [RecommendationsController],
-  providers:   [RecommendationsService, SmartSuggestionsService],
-  exports:     [SmartSuggestionsService],
+  providers: [RecommendationsService, SmartSuggestionsService],
+  exports: [SmartSuggestionsService],
 })
 export class RecommendationsModule {}

@@ -1,6 +1,8 @@
 ﻿import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class InitLot2LineupsPlayers20260212182000 implements MigrationInterface {
+export class InitLot2LineupsPlayers20260212182000
+  implements MigrationInterface
+{
   name = 'InitLot2LineupsPlayers20260212182000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -44,8 +46,9 @@ export class InitLot2LineupsPlayers20260212182000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('DROP TABLE IF EXISTS `fixture_player_stats_snapshots`;');
+    await queryRunner.query(
+      'DROP TABLE IF EXISTS `fixture_player_stats_snapshots`;',
+    );
     await queryRunner.query('DROP TABLE IF EXISTS `fixture_lineups`;');
   }
 }
-

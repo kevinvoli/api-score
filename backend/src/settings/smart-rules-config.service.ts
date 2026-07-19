@@ -12,9 +12,24 @@ export type SmartRulesConfig = {
   secondHalfRule: HalfRule;
   /** Cotes et seuils pour chaque type de suggestion */
   odds: {
-    firstHalfHT: { current: number; min: number; edgePct: number; confidence: number };
-    firstHalfFT: { current: number; min: number; edgePct: number; confidence: number };
-    secondHalf:  { current: number; min: number; edgePct: number; confidence: number };
+    firstHalfHT: {
+      current: number;
+      min: number;
+      edgePct: number;
+      confidence: number;
+    };
+    firstHalfFT: {
+      current: number;
+      min: number;
+      edgePct: number;
+      confidence: number;
+    };
+    secondHalf: {
+      current: number;
+      min: number;
+      edgePct: number;
+      confidence: number;
+    };
   };
 };
 
@@ -22,17 +37,17 @@ const STATE_KEY = 'smart-rules-config';
 
 export const DEFAULT_CONFIG: SmartRulesConfig = {
   firstHalfRules: [
-    { maxElapsed: 10, minShots: 5  },
-    { maxElapsed: 20, minShots: 7  },
+    { maxElapsed: 10, minShots: 5 },
+    { maxElapsed: 20, minShots: 7 },
     { maxElapsed: 30, minShots: 10 },
     { maxElapsed: 40, minShots: 13 },
     { maxElapsed: 45, minShots: 16 },
   ],
   secondHalfRule: { maxElapsed: 60, minShots: 5 },
   odds: {
-    firstHalfHT: { current: 1.75, min: 1.60, edgePct: 12.5, confidence: 70 },
-    firstHalfFT: { current: 1.45, min: 1.35, edgePct:  8.0, confidence: 75 },
-    secondHalf:  { current: 1.65, min: 1.50, edgePct: 10.0, confidence: 72 },
+    firstHalfHT: { current: 1.75, min: 1.6, edgePct: 12.5, confidence: 70 },
+    firstHalfFT: { current: 1.45, min: 1.35, edgePct: 8.0, confidence: 75 },
+    secondHalf: { current: 1.65, min: 1.5, edgePct: 10.0, confidence: 72 },
   },
 };
 
@@ -55,7 +70,7 @@ export class SmartRulesConfigService {
       state.value = config as unknown as Record<string, unknown>;
     } else {
       state = this.stateRepo.create({
-        key:   STATE_KEY,
+        key: STATE_KEY,
         value: config as unknown as Record<string, unknown>,
       });
     }

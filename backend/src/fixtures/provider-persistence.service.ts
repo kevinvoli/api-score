@@ -119,7 +119,13 @@ export class ProviderPersistenceService {
     private readonly standingRepository: Repository<Standing>,
   ) {}
 
-  async persistCountries(countries: Array<{ country_id: number; country_name: string; country_logo?: string }>) {
+  async persistCountries(
+    countries: Array<{
+      country_id: number;
+      country_name: string;
+      country_logo?: string;
+    }>,
+  ) {
     const rows = countries.map((country) => ({
       countryId: country.country_id,
       name: country.country_name,
@@ -140,7 +146,10 @@ export class ProviderPersistenceService {
     await this.leagueRepository.upsert(rows, ['leagueId']);
   }
 
-  async persistTeams(leagueId: number, teams: ProviderTeamPayload[]): Promise<void> {
+  async persistTeams(
+    leagueId: number,
+    teams: ProviderTeamPayload[],
+  ): Promise<void> {
     if (!leagueId || !teams.length) return;
 
     const rows = teams.map((payload) => ({
@@ -155,7 +164,10 @@ export class ProviderPersistenceService {
     await this.teamRepository.upsert(rows, ['teamKey']);
   }
 
-  async persistMatches(leagueId: number, matches: ProviderMatchPayload[]): Promise<void> {
+  async persistMatches(
+    leagueId: number,
+    matches: ProviderMatchPayload[],
+  ): Promise<void> {
     if (!leagueId || !matches.length) return;
 
     const toNum = (v: unknown): number | null => {
@@ -211,7 +223,10 @@ export class ProviderPersistenceService {
     await this.matchRepository.upsert(rows, ['fixtureId']);
   }
 
-  async persistStandings(leagueId: number, entries: ProviderStandingEntry[]): Promise<void> {
+  async persistStandings(
+    leagueId: number,
+    entries: ProviderStandingEntry[],
+  ): Promise<void> {
     if (!leagueId || !entries.length) return;
 
     const toNum = (v: unknown): number => {
@@ -277,7 +292,9 @@ export class ProviderPersistenceService {
 
   // ── Cache-read helpers (DB → API format) ─────────────────────
 
-  async findAllCountries(): Promise<Array<{ country_id: number; country_name: string; country_logo?: string }>> {
+  async findAllCountries(): Promise<
+    Array<{ country_id: number; country_name: string; country_logo?: string }>
+  > {
     const rows = await this.countryRepository.find({ order: { name: 'ASC' } });
     return rows.map((c) => ({
       country_id: c.countryId,
@@ -286,9 +303,14 @@ export class ProviderPersistenceService {
     }));
   }
 
-  async findLeaguesByCountry(countryId?: number): Promise<ProviderLeaguePayload[]> {
+  async findLeaguesByCountry(
+    countryId?: number,
+  ): Promise<ProviderLeaguePayload[]> {
     const where = countryId != null ? { countryId } : {};
-    const rows = await this.leagueRepository.find({ where, order: { name: 'ASC' } });
+    const rows = await this.leagueRepository.find({
+      where,
+      order: { name: 'ASC' },
+    });
     return rows.map((l) => ({
       league_id: l.leagueId,
       league_name: l.name,
@@ -300,7 +322,10 @@ export class ProviderPersistenceService {
   }
 
   async findTeamsByLeague(leagueId: number): Promise<ProviderTeamPayload[]> {
-    const rows = await this.teamRepository.find({ where: { leagueId }, order: { name: 'ASC' } });
+    const rows = await this.teamRepository.find({
+      where: { leagueId },
+      order: { name: 'ASC' },
+    });
     return rows.map((t) => ({
       team_key: t.teamKey,
       team_name: t.name,
@@ -319,16 +344,20 @@ export class ProviderPersistenceService {
   async replayFromPayloads(): Promise<void> {
     const countriesPayload = await this.getLatestPayload('countries');
     if (countriesPayload && Array.isArray(countriesPayload.payload)) {
-      await this.persistCountries(countriesPayload.payload as Array<{
-        country_id: number;
-        country_name: string;
-        country_logo?: string;
-      }>);
+      await this.persistCountries(
+        countriesPayload.payload as Array<{
+          country_id: number;
+          country_name: string;
+          country_logo?: string;
+        }>,
+      );
     }
 
     const leaguesPayload = await this.getLatestPayload('leagues');
     if (leaguesPayload && Array.isArray(leaguesPayload.payload)) {
-      await this.persistLeagues(leaguesPayload.payload as ProviderLeaguePayload[]);
+      await this.persistLeagues(
+        leaguesPayload.payload as ProviderLeaguePayload[],
+      );
     }
 
     const teamPayloads = await this.payloadRepository.find({

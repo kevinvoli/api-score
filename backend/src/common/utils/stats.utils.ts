@@ -14,9 +14,14 @@ export function getStatValue(
     return 0;
   }
 
-  const statistics = Array.isArray((statsPayload as { statistics?: unknown }).statistics)
-    ? ((statsPayload as { statistics: Array<{ type?: unknown; value?: unknown }> })
-        .statistics as Array<{ type?: unknown; value?: unknown }>)
+  const statistics = Array.isArray(
+    (statsPayload as { statistics?: unknown }).statistics,
+  )
+    ? ((
+        statsPayload as {
+          statistics: Array<{ type?: unknown; value?: unknown }>;
+        }
+      ).statistics as Array<{ type?: unknown; value?: unknown }>)
     : [];
 
   for (const stat of statistics) {
@@ -40,7 +45,9 @@ export function getStatValue(
   return 0;
 }
 
-export function computePressureIndex(statsPayload: Record<string, unknown> | null): number {
+export function computePressureIndex(
+  statsPayload: Record<string, unknown> | null,
+): number {
   if (!statsPayload) {
     return 0;
   }
@@ -48,7 +55,10 @@ export function computePressureIndex(statsPayload: Record<string, unknown> | nul
   const attacks = getStatValue(statsPayload, ['Attacks']);
   const dangerousAttacks = getStatValue(statsPayload, ['Dangerous Attacks']);
   const onTarget = getStatValue(statsPayload, ['On Target', 'Shots on Goal']);
-  const offTarget = getStatValue(statsPayload, ['Off Target', 'Shots off Goal']);
+  const offTarget = getStatValue(statsPayload, [
+    'Off Target',
+    'Shots off Goal',
+  ]);
   const corners = getStatValue(statsPayload, ['Corner Kicks', 'Corners']);
 
   return (

@@ -10,9 +10,6 @@ export class MatchController {
     const matches = await this.matchService.fetchLiveMatches();
     const filteredMatches = this.matchService.filterMatches(matches);
     const coupons = this.matchService.generateCoupons(filteredMatches);
-    return { count: coupons.length, coupons};
+    return { count: coupons.length, coupons };
   }
-
-
- 
 }

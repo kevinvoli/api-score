@@ -5,9 +5,24 @@ export class AddTeamFields20260220126000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const table = 'teams';
-    await this.addColumn(queryRunner, table, 'code', 'ALTER TABLE `teams` ADD COLUMN `code` varchar(20) NULL AFTER `name`;');
-    await this.addColumn(queryRunner, table, 'national', 'ALTER TABLE `teams` ADD COLUMN `national` tinyint NULL AFTER `founded`;');
-    await this.addColumn(queryRunner, table, 'venueId', 'ALTER TABLE `teams` ADD COLUMN `venueId` int NULL AFTER `badge`;');
+    await this.addColumn(
+      queryRunner,
+      table,
+      'code',
+      'ALTER TABLE `teams` ADD COLUMN `code` varchar(20) NULL AFTER `name`;',
+    );
+    await this.addColumn(
+      queryRunner,
+      table,
+      'national',
+      'ALTER TABLE `teams` ADD COLUMN `national` tinyint NULL AFTER `founded`;',
+    );
+    await this.addColumn(
+      queryRunner,
+      table,
+      'venueId',
+      'ALTER TABLE `teams` ADD COLUMN `venueId` int NULL AFTER `badge`;',
+    );
     await this.addColumn(
       queryRunner,
       table,
@@ -50,7 +65,10 @@ export class AddTeamFields20260220126000 implements MigrationInterface {
     const table = 'teams';
     const hasVenueImage = await queryRunner.hasColumn(table, 'venueImage');
     const hasVenueSurface = await queryRunner.hasColumn(table, 'venueSurface');
-    const hasVenueCapacity = await queryRunner.hasColumn(table, 'venueCapacity');
+    const hasVenueCapacity = await queryRunner.hasColumn(
+      table,
+      'venueCapacity',
+    );
     const hasVenueCity = await queryRunner.hasColumn(table, 'venueCity');
     const hasVenueAddress = await queryRunner.hasColumn(table, 'venueAddress');
     const hasVenueName = await queryRunner.hasColumn(table, 'venueName');
@@ -62,16 +80,22 @@ export class AddTeamFields20260220126000 implements MigrationInterface {
       await queryRunner.query('ALTER TABLE `teams` DROP COLUMN `venueImage`;');
     }
     if (hasVenueSurface) {
-      await queryRunner.query('ALTER TABLE `teams` DROP COLUMN `venueSurface`;');
+      await queryRunner.query(
+        'ALTER TABLE `teams` DROP COLUMN `venueSurface`;',
+      );
     }
     if (hasVenueCapacity) {
-      await queryRunner.query('ALTER TABLE `teams` DROP COLUMN `venueCapacity`;');
+      await queryRunner.query(
+        'ALTER TABLE `teams` DROP COLUMN `venueCapacity`;',
+      );
     }
     if (hasVenueCity) {
       await queryRunner.query('ALTER TABLE `teams` DROP COLUMN `venueCity`;');
     }
     if (hasVenueAddress) {
-      await queryRunner.query('ALTER TABLE `teams` DROP COLUMN `venueAddress`;');
+      await queryRunner.query(
+        'ALTER TABLE `teams` DROP COLUMN `venueAddress`;',
+      );
     }
     if (hasVenueName) {
       await queryRunner.query('ALTER TABLE `teams` DROP COLUMN `venueName`;');
@@ -111,7 +135,9 @@ export class AddTeamFields20260220126000 implements MigrationInterface {
     if (!(error instanceof QueryFailedError)) {
       return false;
     }
-    const driverError = (error as QueryFailedError).driverError as { code?: string };
+    const driverError = (error as QueryFailedError).driverError as {
+      code?: string;
+    };
     return driverError?.code === 'ER_DUP_FIELDNAME';
   }
 }

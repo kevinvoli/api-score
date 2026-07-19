@@ -1,6 +1,8 @@
 ﻿import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class InitLot2FixturesIngestion20260212174000 implements MigrationInterface {
+export class InitLot2FixturesIngestion20260212174000
+  implements MigrationInterface
+{
   name = 'InitLot2FixturesIngestion20260212174000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -76,4 +78,3 @@ export class InitLot2FixturesIngestion20260212174000 implements MigrationInterfa
     await queryRunner.query('DROP TABLE IF EXISTS `fixtures`;');
   }
 }
-

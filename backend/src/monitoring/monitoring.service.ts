@@ -124,21 +124,39 @@ export class MonitoringService {
     const totalCalls = logs.length;
 
     const errors5xx = logs.filter((l) => l.responseStatus >= 500).length;
-    const timeoutMs = this.configService.get<number>('REQUEST_TIMEOUT_MS', 30000);
+    const timeoutMs = this.configService.get<number>(
+      'REQUEST_TIMEOUT_MS',
+      30000,
+    );
     const timeouts = logs.filter((l) => l.latencyMs >= timeoutMs).length;
 
-    const errorRate5xx_pct = totalCalls > 0 ? Math.round((errors5xx / totalCalls) * 100) : 0;
-    const timeoutRate_pct = totalCalls > 0 ? Math.round((timeouts / totalCalls) * 100) : 0;
+    const errorRate5xx_pct =
+      totalCalls > 0 ? Math.round((errors5xx / totalCalls) * 100) : 0;
+    const timeoutRate_pct =
+      totalCalls > 0 ? Math.round((timeouts / totalCalls) * 100) : 0;
 
     const rateLimitValues = logs
       .map((l) => l.rateLimitRemaining)
       .filter((v): v is number => v !== null);
-    const quotaRemainingMin = rateLimitValues.length > 0 ? Math.min(...rateLimitValues) : null;
-    const rateLimitPerMin = this.configService.get<number>('RATE_LIMIT_PER_MIN', 300);
+    const quotaRemainingMin =
+      rateLimitValues.length > 0 ? Math.min(...rateLimitValues) : null;
+    const rateLimitPerMin = this.configService.get<number>(
+      'RATE_LIMIT_PER_MIN',
+      300,
+    );
 
-    const alertErrorRatePct = this.configService.get<number>('ALERT_ERROR_RATE_PCT', 20);
-    const alertTimeoutRatePct = this.configService.get<number>('ALERT_TIMEOUT_RATE_PCT', 20);
-    const alertQuotaMinPct = this.configService.get<number>('ALERT_QUOTA_REMAINING_MIN_PCT', 10);
+    const alertErrorRatePct = this.configService.get<number>(
+      'ALERT_ERROR_RATE_PCT',
+      20,
+    );
+    const alertTimeoutRatePct = this.configService.get<number>(
+      'ALERT_TIMEOUT_RATE_PCT',
+      20,
+    );
+    const alertQuotaMinPct = this.configService.get<number>(
+      'ALERT_QUOTA_REMAINING_MIN_PCT',
+      10,
+    );
 
     const alerts: PipelineAlert[] = [];
 
@@ -161,7 +179,9 @@ export class MonitoringService {
     }
 
     if (quotaRemainingMin !== null) {
-      const quotaRemainingPct = Math.round((quotaRemainingMin / rateLimitPerMin) * 100);
+      const quotaRemainingPct = Math.round(
+        (quotaRemainingMin / rateLimitPerMin) * 100,
+      );
       if (quotaRemainingPct < alertQuotaMinPct) {
         alerts.push({
           type: 'LOW_QUOTA',
@@ -187,7 +207,9 @@ export class MonitoringService {
   }
 
   private notifyAlerts(alerts: PipelineAlert[]): void {
-    const webhookUrl = this.configService.get<string>('SLACK_ALERT_WEBHOOK_URL');
+    const webhookUrl = this.configService.get<string>(
+      'SLACK_ALERT_WEBHOOK_URL',
+    );
 
     for (const alert of alerts) {
       this.logger.error(
@@ -203,23 +225,24 @@ export class MonitoringService {
 
       if (webhookUrl) {
         const text = `[api-score] ALERT: ${alert.type} = ${alert.value} (seuil: ${alert.threshold})`;
-        axios
-          .post(webhookUrl, { text })
-          .catch((err: unknown) => {
-            this.logger.warn(
-              {
-                event: 'slack_alert_failed',
-                alertType: alert.type,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              'MonitoringService',
-            );
-          });
+        axios.post(webhookUrl, { text }).catch((err: unknown) => {
+          this.logger.warn(
+            {
+              event: 'slack_alert_failed',
+              alertType: alert.type,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            'MonitoringService',
+          );
+        });
       }
     }
   }
 
-  private async checkDatabase(): Promise<{ status: 'up' | 'down'; latency_ms: number | null }> {
+  private async checkDatabase(): Promise<{
+    status: 'up' | 'down';
+    latency_ms: number | null;
+  }> {
     const start = Date.now();
     try {
       await Promise.race([
@@ -261,7 +284,10 @@ export class MonitoringService {
 
   private timeout(ms: number): Promise<never> {
     return new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`Health check timed out after ${ms}ms`)), ms),
+      setTimeout(
+        () => reject(new Error(`Health check timed out after ${ms}ms`)),
+        ms,
+      ),
     );
   }
 }

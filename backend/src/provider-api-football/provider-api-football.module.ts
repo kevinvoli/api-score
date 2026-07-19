@@ -6,7 +6,10 @@ import { ApiFootballPayload } from '../database/entities/api-football-payload.en
 import { ApiFootballClient } from './services/api-football.client';
 
 @Module({
-  imports: [HttpModule, TypeOrmModule.forFeature([ApiUsageLog, ApiFootballPayload])],
+  imports: [
+    HttpModule,
+    TypeOrmModule.forFeature([ApiUsageLog, ApiFootballPayload]),
+  ],
   providers: [ApiFootballClient],
   exports: [ApiFootballClient],
 })

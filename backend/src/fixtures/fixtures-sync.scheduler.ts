@@ -110,12 +110,14 @@ export class FixturesSyncScheduler implements OnModuleInit, OnModuleDestroy {
     try {
       await this.fixturesIngestionService.syncLiveFixtures();
       // Évaluer les règles métier immédiatement après chaque sync réussie
-      void this.smartSuggestionsService.evaluateAndSave().catch((err: unknown) => {
-        this.logger.warn(
-          { event: 'smart_suggestions_eval_failed', error: String(err) },
-          'FixturesSyncScheduler',
-        );
-      });
+      void this.smartSuggestionsService
+        .evaluateAndSave()
+        .catch((err: unknown) => {
+          this.logger.warn(
+            { event: 'smart_suggestions_eval_failed', error: String(err) },
+            'FixturesSyncScheduler',
+          );
+        });
       this.onSyncSuccess();
     } catch (error) {
       this.logger.error(
@@ -180,15 +182,15 @@ export class FixturesSyncScheduler implements OnModuleInit, OnModuleDestroy {
     this.jobState = 'active';
     this.consecutiveFailures = 0;
     this.pausedUntil = null;
-    this.logger.log(
-      { event: 'job_state_resumed' },
-      'FixturesSyncScheduler',
-    );
+    this.logger.log({ event: 'job_state_resumed' }, 'FixturesSyncScheduler');
     return true;
   }
 
   private async hasRateBudget(): Promise<boolean> {
-    const perMinuteLimit = this.configService.get<number>('RATE_LIMIT_PER_MIN', 300);
+    const perMinuteLimit = this.configService.get<number>(
+      'RATE_LIMIT_PER_MIN',
+      300,
+    );
     const headroomPct = this.configService.get<number>(
       'SYNC_RATE_LIMIT_HEADROOM_PCT',
       90,

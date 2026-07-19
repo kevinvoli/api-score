@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import * as crypto from 'crypto';
@@ -28,7 +33,8 @@ export class ApiKeyGuard implements CanActivate {
     const expected = Buffer.from(expectedKey);
 
     if (provided.length !== expected.length) throw new UnauthorizedException();
-    if (!crypto.timingSafeEqual(provided, expected)) throw new UnauthorizedException();
+    if (!crypto.timingSafeEqual(provided, expected))
+      throw new UnauthorizedException();
 
     return true;
   }

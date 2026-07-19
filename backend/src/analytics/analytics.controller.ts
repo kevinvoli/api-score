@@ -1,4 +1,11 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 
 @Controller('analytics')
@@ -24,6 +31,8 @@ export class AnalyticsController {
   @Post('fixtures/recompute-latest')
   recomputeLatest(@Query('limit') limit?: string) {
     const parsed = limit ? Number(limit) : 10;
-    return this.analyticsService.recomputeLatest(Number.isNaN(parsed) ? 10 : parsed);
+    return this.analyticsService.recomputeLatest(
+      Number.isNaN(parsed) ? 10 : parsed,
+    );
   }
 }
