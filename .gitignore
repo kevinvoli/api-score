@@ -7,3 +7,6 @@ front/.storybook/cache
 
 # Logs
 *.log
+
+# Secrets locaux
+front/.env.local
