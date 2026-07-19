@@ -19,6 +19,8 @@ import { ArchiveModule } from './archive/archive.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { TeamsModule } from './teams/teams.module';
 import { OddsModule } from './odds/odds.module';
+import { BacktestModule } from './backtest/backtest.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { OddsModule } from './odds/odds.module';
     AnalyticsModule,
     TeamsModule,
     OddsModule,
+    BacktestModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ApiKeyGuard }],
