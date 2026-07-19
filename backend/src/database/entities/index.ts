@@ -1,7 +1,9 @@
 import { ApiFootballPayload } from './api-football-payload.entity';
 import { ApiUsageLog } from './api-usage-log.entity';
 import { AppRuntimeState } from './app-runtime-state.entity';
+import { BacktestRun } from './backtest-run.entity';
 import { BetRecommendation } from './bet-recommendation.entity';
+import { BetResult } from './bet-result.entity';
 import { Country } from './country.entity';
 import { Fixture } from './fixture.entity';
 import { FixtureAnalytics } from './fixture-analytics.entity';
@@ -20,7 +22,9 @@ export const ALL_ENTITIES = [
   ApiFootballPayload,
   ApiUsageLog,
   AppRuntimeState,
+  BacktestRun,
   BetRecommendation,
+  BetResult,
   Country,
   Fixture,
   FixtureAnalytics,

@@ -7,11 +7,23 @@ import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapsho
 import { BetRecommendation } from '../database/entities/bet-recommendation.entity';
 import { SmartCoupon } from '../database/entities/smart-coupon.entity';
 import { JsonLogger } from '../common/json.logger';
+import { extractTotalShots, extractHtScore } from '../common/utils/stats.utils';
 import {
   SmartRulesConfigService,
-  DEFAULT_CONFIG,
+  SmartRulesConfig,
 } from '../settings/smart-rules-config.service';
 import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
+import {
+  evaluateRules,
+  RuleEvaluationInput,
+  FIRST_HALF_STATUSES,
+  SECOND_HALF_STATUSES,
+} from './rules/rules-evaluator';
+import {
+  resolveOutcome,
+  ResolvableBet,
+  FinalMatchState,
+} from './rules/outcome-resolver';
 
 export type SmartSuggestion = {
   id: string;
@@ -35,59 +47,16 @@ export type SmartSuggestion = {
   isHomeTeam: boolean;
 };
 
-const FIRST_HALF_STATUSES = ['1H', 'LIVE'];
-const SECOND_HALF_STATUSES = ['2H', 'LIVE'];
 const AUTO_MARKET_TYPES = [
   'Buts 1ère mi-temps',
   'Buts match',
   'Buts 2ème mi-temps',
 ];
 
-// Statuts indiquant que la mi-temps est terminée (score HT connu)
-// Valeurs normalisées par normalizeApifootballStatus + api-sports status.short
-const POST_HT_STATUSES = new Set([
-  'HT',
-  '2H',
-  'ET',
-  'BT',
-  'P',
-  'FT',
-  'AET',
-  'PEN',
-  'AWD',
-  'WO',
-]);
-// Statuts indiquant que le match est terminé (score FT connu)
-const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'AWD', 'WO']);
-// Statuts "voids" : match annulé / reporté / interrompu définitivement → coupon LOST
-// Valeurs normalisées : Cancelled→CANC, Postponed→PST, Suspended→SUSP, Pen.→PEN (déjà dans FINISHED)
-const VOID_STATUSES = new Set([
-  'CANC',
-  'PST',
-  'INT',
-  'SUSP',
-  'ABD',
-  'TBD',
-  'WO',
-]);
-
-type SuggestionPartial = Pick<
-  SmartSuggestion,
-  | 'marketType'
-  | 'selection'
-  | 'currentOdd'
-  | 'minAcceptableOdd'
-  | 'edgePct'
-  | 'confidenceScore'
-  | 'reasons'
+type LiveOddsMap = Map<
+  number,
+  { ou05Over: number | null; ou05Under: number | null }
 >;
-type SuggestionBuilder = (
-  teamName: string,
-  elapsed: number,
-  shots: number,
-  rule: { maxElapsed: number; minShots: number },
-  liveOdd: number | null,
-) => SuggestionPartial;
 
 @Injectable()
 export class SmartSuggestionsService {
@@ -111,15 +80,7 @@ export class SmartSuggestionsService {
   async getAllSuggestions(): Promise<SmartSuggestion[]> {
     const [config, liveOdds] = await Promise.all([
       this.configService.getConfig(),
-      this.apiClient
-        .fetchAllLiveOdds()
-        .catch(
-          () =>
-            new Map<
-              number,
-              { ou05Over: number | null; ou05Under: number | null }
-            >(),
-        ),
+      this.apiClient.fetchAllLiveOdds().catch(() => new Map() as LiveOddsMap),
     ]);
     const [firstHalf, secondHalf] = await Promise.all([
       this.getFirstHalfSuggestions(config, liveOdds),
@@ -274,8 +235,11 @@ export class SmartSuggestionsService {
       const fixture = fixtureMap.get(coupon.fixtureId);
       if (!fixture) continue;
 
-      const status = fixture.statusShort ?? '';
-      const resolved = this.resolveCouponOutcome(coupon, fixture, status);
+      const bet: ResolvableBet = {
+        marketType: coupon.marketType,
+        isHomeTeam: coupon.isHomeTeam,
+      };
+      const resolved = resolveOutcome(bet, this.toFinalMatchState(fixture));
       if (resolved === null) continue; // pas encore décidable
 
       coupon.status = resolved;
@@ -284,117 +248,27 @@ export class SmartSuggestionsService {
     }
   }
 
-  /**
-   * Résolution en temps réel : vérifie à chaque sync si la prédiction est déjà
-   * réalisée (WON dès qu'un but est détecté), ou si la période est closes sans
-   * but (LOST). Retourne null tant que c'est indécidable.
-   *
-   * Principe :
-   *  - WON  → détectable dès que le score change dans la bonne période
-   *  - LOST → seulement quand la période se ferme (HT passé / match terminé)
-   */
-  private resolveCouponOutcome(
-    coupon: SmartCoupon,
-    fixture: Fixture,
-    statusShort: string,
-  ): 'WON' | 'LOST' | null {
-    // Match annulé / reporté / interrompu → coupon perdu
-    if (VOID_STATUSES.has(statusShort)) return 'LOST';
-
+  /** Construit l'état final normalisé attendu par le résolveur pur. */
+  private toFinalMatchState(fixture: Fixture): FinalMatchState {
     const raw = (fixture.raw ?? {}) as Record<string, unknown>;
-    const isHome = coupon.isHomeTeam;
-
-    // ── Buts 1ère mi-temps ──────────────────────────────────────
-    // WON dès qu'un but est marqué pendant la 1H (score live > 0 pour l'équipe)
-    // LOST quand la MT est terminée et le score HT = 0
-    if (coupon.marketType === 'Buts 1ère mi-temps') {
-      // Pendant la 1H : vérifier le score live
-      if (FIRST_HALF_STATUSES.includes(statusShort)) {
-        const liveScore = isHome ? fixture.scoreHome : fixture.scoreAway;
-        if (liveScore != null && liveScore > 0) return 'WON';
-        return null; // 1H en cours, pas encore de but
-      }
-      // Après la 1H : score HT définitif disponible
-      if (POST_HT_STATUSES.has(statusShort)) {
-        const htScore = this.extractHtScore(raw, isHome);
-        if (htScore === null) return null; // score HT manquant, attendre
-        return htScore > 0 ? 'WON' : 'LOST';
-      }
-      return null;
-    }
-
-    // ── Buts match ──────────────────────────────────────────────
-    // WON dès qu'un but est marqué à n'importe quel moment du match
-    // LOST seulement quand le match est terminé avec score = 0
-    if (coupon.marketType === 'Buts match') {
-      const teamScore = isHome ? fixture.scoreHome : fixture.scoreAway;
-      if (teamScore != null && teamScore > 0) return 'WON'; // but déjà marqué → WON immédiat
-      if (FINISHED_STATUSES.has(statusShort)) return 'LOST'; // match fini, score = 0
-      return null; // match en cours, score = 0 pour l'instant
-    }
-
-    // ── Buts 2ème mi-temps ──────────────────────────────────────
-    // WON dès qu'un but est marqué en 2H (score actuel - score HT > 0)
-    // LOST seulement quand le match est terminé sans but en 2H
-    if (coupon.marketType === 'Buts 2ème mi-temps') {
-      const currentScore = isHome ? fixture.scoreHome : fixture.scoreAway;
-      const htScore = this.extractHtScore(raw, isHome);
-
-      if (currentScore != null && htScore !== null) {
-        // Calcul des buts marqués depuis la MT (valable en live et en fin de match)
-        const secondHalfGoals = currentScore - htScore;
-        if (secondHalfGoals > 0) return 'WON'; // but en 2MT déjà marqué → WON immédiat
-      } else if (currentScore != null && htScore === null) {
-        // Score HT inconnu : si le match est fini et score > 0, WON
-        if (FINISHED_STATUSES.has(statusShort) && currentScore > 0)
-          return 'WON';
-      }
-
-      if (FINISHED_STATUSES.has(statusShort)) return 'LOST'; // match fini, pas de but en 2MT
-      return null; // 2H en cours, pas encore de but en 2MT
-    }
-
-    return null;
-  }
-
-  /** Extrait le score à la mi-temps depuis le champ `raw` de la fixture. */
-  private extractHtScore(
-    raw: Record<string, unknown>,
-    isHome: boolean,
-  ): number | null {
-    // Format apifootball
-    const apifootballKey = isHome
-      ? 'match_hometeam_halftime_score'
-      : 'match_awayteam_halftime_score';
-    if (raw[apifootballKey] !== undefined && raw[apifootballKey] !== '') {
-      const n = Number(raw[apifootballKey]);
-      if (!Number.isNaN(n)) return n;
-    }
-    // Format api-sports
-    const apiSportsScore = (raw as any)?.score?.halftime;
-    if (apiSportsScore) {
-      const val = isHome ? apiSportsScore.home : apiSportsScore.away;
-      if (val !== null && val !== undefined) {
-        const n = Number(val);
-        if (!Number.isNaN(n)) return n;
-      }
-    }
-    return null;
+    return {
+      statusShort: fixture.statusShort ?? '',
+      scoreHome: fixture.scoreHome,
+      scoreAway: fixture.scoreAway,
+      htScoreHome: extractHtScore(raw, true),
+      htScoreAway: extractHtScore(raw, false),
+    };
   }
 
   // ── Règles par mi-temps ──────────────────────────────────────
 
   private async getFirstHalfSuggestions(
-    config: typeof DEFAULT_CONFIG,
-    liveOdds: Map<
-      number,
-      { ou05Over: number | null; ou05Under: number | null }
-    >,
+    config: SmartRulesConfig,
+    liveOdds: LiveOddsMap,
   ): Promise<SmartSuggestion[]> {
-    const rules = config.firstHalfRules;
-    const oddsHT = config.odds.firstHalfHT;
-    const oddsFT = config.odds.firstHalfFT;
-    const maxWindow = Math.max(...rules.map((r) => r.maxElapsed));
+    const maxWindow = Math.max(
+      ...config.firstHalfRules.map((r) => r.maxElapsed),
+    );
 
     const fixtures = await this.fixtureRepo
       .createQueryBuilder('f')
@@ -406,50 +280,14 @@ export class SmartSuggestionsService {
       .andWhere('f.elapsed < :max', { max: maxWindow })
       .getMany();
 
-    return this.evaluateFixtures({
-      fixtures,
-      liveOdds,
-      rules,
-      halfSuffix: 'fh',
-
-      buildPrimary: (teamName, elapsed, shots, rule, liveOdd) => ({
-        marketType: 'Buts 1ère mi-temps',
-        selection: `${teamName} marque avant la mi-temps (+0.5)`,
-        currentOdd: liveOdd ?? oddsHT.current,
-        minAcceptableOdd: oddsHT.min,
-        edgePct: oddsHT.edgePct,
-        confidenceScore: oddsHT.confidence,
-        reasons: [
-          `${shots} tirs à ${elapsed}' (seuil : ≥${rule.minShots} avant ${rule.maxElapsed}')`,
-          'Forte pression offensive',
-          'Probabilité accrue de marquer avant la mi-temps',
-        ],
-      }),
-      buildSecondary: (teamName, elapsed, shots, rule, liveOdd) => ({
-        marketType: 'Buts match',
-        selection: `${teamName} marque dans le match (+0.5)`,
-        currentOdd: liveOdd ?? oddsFT.current,
-        minAcceptableOdd: oddsFT.min,
-        edgePct: oddsFT.edgePct,
-        confidenceScore: oddsFT.confidence,
-        reasons: [
-          `${shots} tirs à ${elapsed}' (seuil : ≥${rule.minShots} avant ${rule.maxElapsed}')`,
-          'Domination offensive confirmée',
-          'Haute probabilité de scorer sur 90 minutes',
-        ],
-      }),
-    });
+    return this.evaluateFixturesWithRules(fixtures, config, liveOdds, 'fh');
   }
 
   private async getSecondHalfSuggestions(
-    config: typeof DEFAULT_CONFIG,
-    liveOdds: Map<
-      number,
-      { ou05Over: number | null; ou05Under: number | null }
-    >,
+    config: SmartRulesConfig,
+    liveOdds: LiveOddsMap,
   ): Promise<SmartSuggestion[]> {
     const rule = config.secondHalfRule;
-    const odds = config.odds.secondHalf;
 
     const fixtures = await this.fixtureRepo
       .createQueryBuilder('f')
@@ -463,8 +301,24 @@ export class SmartSuggestionsService {
 
     if (!fixtures.length) return [];
 
-    // Snapshots HT : dernier snapshot par (fixtureId, teamId) avec elapsed ≤ 45
-    // Sert de baseline pour ne comptabiliser que les tirs de la 2ème mi-temps
+    const htBaseline = await this.buildHtBaseline(fixtures);
+
+    return this.evaluateFixturesWithRules(
+      fixtures,
+      config,
+      liveOdds,
+      'sh',
+      htBaseline,
+    );
+  }
+
+  /**
+   * Snapshots HT : dernier snapshot par (fixtureId, teamId) avec elapsed ≤ 45.
+   * Sert de baseline pour ne comptabiliser que les tirs de la 2ème mi-temps.
+   */
+  private async buildHtBaseline(
+    fixtures: Fixture[],
+  ): Promise<Map<string, number>> {
     const fixtureIds = fixtures.map((f) => f.id);
     const htSnapshots = await this.statsRepo
       .createQueryBuilder('s')
@@ -473,58 +327,35 @@ export class SmartSuggestionsService {
       .orderBy('s.snapshotAt', 'DESC')
       .getMany();
 
-    // Map : `${fixtureId}:${teamId}` → tirs à la mi-temps
     const htBaseline = new Map<string, number>();
     for (const snap of htSnapshots) {
       if (!snap.teamId) continue;
       const key = `${snap.fixtureId}:${snap.teamId}`;
       if (!htBaseline.has(key)) {
-        const shots = this.extractTotalShots(snap.stats);
+        const shots = extractTotalShots(snap.stats);
         if (shots !== null) htBaseline.set(key, shots);
       }
     }
-
-    return this.evaluateFixtures({
-      fixtures,
-      liveOdds,
-      htBaseline,
-      rules: [rule],
-      halfSuffix: 'sh',
-      buildPrimary: (teamName, elapsed, shots, rule, liveOdd) => ({
-        marketType: 'Buts 2ème mi-temps',
-        selection: `${teamName} marque en 2ème mi-temps (+0.5)`,
-        currentOdd: liveOdd ?? odds.current,
-        minAcceptableOdd: odds.min,
-        edgePct: odds.edgePct,
-        confidenceScore: odds.confidence,
-        reasons: [
-          `${shots} tirs en 2MT à ${elapsed}' (seuil : ≥${rule.minShots} avant ${rule.maxElapsed}')`,
-          'Pression offensive confirmée en 2ème mi-temps',
-          'Fort potentiel de marquer avant la fin du match',
-        ],
-      }),
-      buildSecondary: null,
-    });
+    return htBaseline;
   }
 
   // ── Moteur d'évaluation partagé ──────────────────────────────
 
-  private async evaluateFixtures(opts: {
-    fixtures: Fixture[];
-    liveOdds: Map<
-      number,
-      { ou05Over: number | null; ou05Under: number | null }
-    >;
-    /** Baseline de tirs à soustraire (tirs à la MT pour les règles 2ème mi-temps) */
-    htBaseline?: Map<string, number>;
-    rules: { maxElapsed: number; minShots: number }[];
-    halfSuffix: string;
-    buildPrimary: SuggestionBuilder;
-    buildSecondary: SuggestionBuilder | null;
-  }): Promise<SmartSuggestion[]> {
-    if (!opts.fixtures.length) return [];
+  /**
+   * Adaptateur : charge les entités, construit l'input de l'évaluateur pur
+   * et mappe les `RuleMatch` obtenus vers des `SmartSuggestion` persistables.
+   * Aucune logique de règle n'est appliquée ici (voir rules/rules-evaluator.ts).
+   */
+  private async evaluateFixturesWithRules(
+    fixtures: Fixture[],
+    config: SmartRulesConfig,
+    liveOdds: LiveOddsMap,
+    halfSuffix: string,
+    htBaseline?: Map<string, number>,
+  ): Promise<SmartSuggestion[]> {
+    if (!fixtures.length) return [];
 
-    const fixtureIds = opts.fixtures.map((f) => f.id);
+    const fixtureIds = fixtures.map((f) => f.id);
     const allSnapshots = await this.statsRepo
       .createQueryBuilder('s')
       .where('s.fixtureId IN (:...ids)', { ids: fixtureIds })
@@ -543,128 +374,85 @@ export class SmartSuggestionsService {
 
     const suggestions: SmartSuggestion[] = [];
 
-    for (const fixture of opts.fixtures) {
+    for (const fixture of fixtures) {
       const teamMap = latestByTeam.get(fixture.id);
       if (!teamMap) continue;
+      if (fixture.homeTeamId === null || fixture.awayTeamId === null) continue;
 
-      for (const [teamId, snap] of teamMap) {
-        const totalShots = this.extractTotalShots(snap.stats);
-        const elapsed = fixture.elapsed ?? 0;
-        if (totalShots === null) continue;
+      const homeSnap = teamMap.get(fixture.homeTeamId);
+      const awaySnap = teamMap.get(fixture.awayTeamId);
 
-        // Si une baseline HT est fournie, ne garder que les tirs de la 2ème MT
-        const htShots = opts.htBaseline?.get(`${fixture.id}:${teamId}`) ?? 0;
-        const shots = Math.max(0, totalShots - htShots);
-
-        const matchedRule = opts.rules.find(
-          (r) => elapsed < r.maxElapsed && shots >= r.minShots,
-        );
-        if (!matchedRule) continue;
-
-        const isHome = teamId === fixture.homeTeamId;
-        const teamName =
-          (isHome ? fixture.homeTeamName : fixture.awayTeamName) ?? 'Équipe';
-        const label = `${fixture.homeTeamName ?? '?'} vs ${fixture.awayTeamName ?? '?'}`;
-        const idBase = `smart-${opts.halfSuffix}-${fixture.id}-${teamId}`;
-
-        const provId = fixture.providerFixtureId
-          ? Number(fixture.providerFixtureId)
+      const elapsed = fixture.elapsed ?? 0;
+      const provId = fixture.providerFixtureId
+        ? Number(fixture.providerFixtureId)
+        : null;
+      const liveOdd =
+        provId !== null && !Number.isNaN(provId)
+          ? (liveOdds.get(provId)?.ou05Over ?? null)
           : null;
-        const liveOdd =
-          provId !== null && !Number.isNaN(provId)
-            ? (opts.liveOdds.get(provId)?.ou05Over ?? null)
-            : null;
 
-        const primary = opts.buildPrimary(
-          teamName,
-          elapsed,
-          shots,
-          matchedRule,
-          liveOdd,
-        );
-        suggestions.push({
-          id: `${idBase}-a`,
-          fixtureId: fixture.id,
-          fixtureLabel: label,
-          ...primary,
-          riskFlags: [],
-          status: 'NEW',
-          ruleName: 'shots-pressure',
-          elapsed,
-          shotsCount: shots,
-          teamId,
-          teamName,
-          isHomeTeam: isHome,
-        });
+      const input: RuleEvaluationInput = {
+        elapsed,
+        statusShort: fixture.statusShort ?? '',
+        home: {
+          teamId: fixture.homeTeamId,
+          teamName: fixture.homeTeamName ?? 'Équipe',
+          totalShots: homeSnap ? extractTotalShots(homeSnap.stats) : null,
+        },
+        away: {
+          teamId: fixture.awayTeamId,
+          teamName: fixture.awayTeamName ?? 'Équipe',
+          totalShots: awaySnap ? extractTotalShots(awaySnap.stats) : null,
+        },
+        htShots: htBaseline
+          ? {
+              home: htBaseline.get(`${fixture.id}:${fixture.homeTeamId}`) ?? 0,
+              away: htBaseline.get(`${fixture.id}:${fixture.awayTeamId}`) ?? 0,
+            }
+          : undefined,
+        liveOdd,
+      };
 
-        if (opts.buildSecondary) {
-          const secondary = opts.buildSecondary(
-            teamName,
-            elapsed,
-            shots,
-            matchedRule,
-            liveOdd,
-          );
+      const matches = evaluateRules(input, config);
+      if (!matches.length) continue;
+
+      const label = `${fixture.homeTeamName ?? '?'} vs ${fixture.awayTeamName ?? '?'}`;
+
+      // Regroupement par équipe pour préserver le suffixe -a/-b des ids
+      const matchesByTeam = new Map<number, typeof matches>();
+      for (const match of matches) {
+        if (!matchesByTeam.has(match.teamId))
+          matchesByTeam.set(match.teamId, []);
+        matchesByTeam.get(match.teamId)!.push(match);
+      }
+
+      for (const [teamId, teamMatches] of matchesByTeam) {
+        const idBase = `smart-${halfSuffix}-${fixture.id}-${teamId}`;
+        teamMatches.forEach((match, index) => {
           suggestions.push({
-            id: `${idBase}-b`,
+            id: `${idBase}-${index === 0 ? 'a' : 'b'}`,
             fixtureId: fixture.id,
             fixtureLabel: label,
-            ...secondary,
+            marketType: match.marketType,
+            selection: match.selection,
+            currentOdd: match.currentOdd,
+            minAcceptableOdd: match.minAcceptableOdd,
+            edgePct: match.edgePct,
+            confidenceScore: match.confidenceScore,
+            reasons: match.reasons,
             riskFlags: [],
             status: 'NEW',
-            ruleName: 'shots-pressure',
-            elapsed,
-            shotsCount: shots,
-            teamId,
-            teamName,
-            isHomeTeam: isHome,
+            ruleName: match.ruleName,
+            elapsed: match.elapsed,
+            shotsCount: match.shotsCount,
+            teamId: match.teamId,
+            teamName: match.teamName,
+            isHomeTeam: match.isHomeTeam,
           });
-        }
+        });
       }
     }
 
     return suggestions;
-  }
-
-  // ── Utilitaires ──────────────────────────────────────────────
-
-  private extractTotalShots(stats: Record<string, unknown>): number | null {
-    // Noms de type selon le provider :
-    // api-sports   → "Total Shots"
-    // apifootball  → "Shots Total", ou somme "On Target" + "Off Target"
-    const TOTAL_SHOTS_TYPES = ['total shots', 'shots total'];
-
-    const statistics = stats?.statistics;
-    if (Array.isArray(statistics)) {
-      const arr = statistics as Array<{ type?: string; value?: unknown }>;
-
-      for (const entry of arr) {
-        if (
-          entry.type &&
-          TOTAL_SHOTS_TYPES.includes(entry.type.toLowerCase())
-        ) {
-          const n = Number(entry.value);
-          if (!Number.isNaN(n)) return n;
-        }
-      }
-
-      // Fallback : On Target + Off Target (format apifootball)
-      const getValue = (type: string) => {
-        const e = arr.find((x) => x.type?.toLowerCase() === type);
-        return e ? Number(e.value) : NaN;
-      };
-      const onTarget = getValue('on target');
-      const offTarget = getValue('off target');
-      if (!Number.isNaN(onTarget) && !Number.isNaN(offTarget))
-        return onTarget + offTarget;
-      if (!Number.isNaN(onTarget)) return onTarget;
-    }
-
-    const flat = stats?.total_shots ?? stats?.shots;
-    if (flat !== undefined) {
-      const n = Number(flat);
-      return Number.isNaN(n) ? null : n;
-    }
-    return null;
   }
 }

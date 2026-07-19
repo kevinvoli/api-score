@@ -45,6 +45,72 @@ export function getStatValue(
   return 0;
 }
 
+const TOTAL_SHOTS_TYPES = ['total shots', 'shots total'];
+
+/** Extrait le nombre total de tirs d'un snapshot de stats (api-sports ou apifootball). */
+export function extractTotalShots(
+  stats: Record<string, unknown>,
+): number | null {
+  const statistics = stats?.statistics;
+  if (Array.isArray(statistics)) {
+    const arr = statistics as Array<{ type?: string; value?: unknown }>;
+
+    for (const entry of arr) {
+      if (entry.type && TOTAL_SHOTS_TYPES.includes(entry.type.toLowerCase())) {
+        const n = Number(entry.value);
+        if (!Number.isNaN(n)) return n;
+      }
+    }
+
+    // Fallback : On Target + Off Target (format apifootball)
+    const getValue = (type: string) => {
+      const e = arr.find((x) => x.type?.toLowerCase() === type);
+      return e ? Number(e.value) : NaN;
+    };
+    const onTarget = getValue('on target');
+    const offTarget = getValue('off target');
+    if (!Number.isNaN(onTarget) && !Number.isNaN(offTarget))
+      return onTarget + offTarget;
+    if (!Number.isNaN(onTarget)) return onTarget;
+  }
+
+  const flat = stats?.total_shots ?? stats?.shots;
+  if (flat !== undefined) {
+    const n = Number(flat);
+    return Number.isNaN(n) ? null : n;
+  }
+  return null;
+}
+
+interface ApiSportsHalftimeScore {
+  score?: { halftime?: { home?: unknown; away?: unknown } };
+}
+
+/** Extrait le score à la mi-temps depuis le champ `raw` d'une fixture. */
+export function extractHtScore(
+  raw: Record<string, unknown>,
+  isHome: boolean,
+): number | null {
+  // Format apifootball
+  const apifootballKey = isHome
+    ? 'match_hometeam_halftime_score'
+    : 'match_awayteam_halftime_score';
+  if (raw[apifootballKey] !== undefined && raw[apifootballKey] !== '') {
+    const n = Number(raw[apifootballKey]);
+    if (!Number.isNaN(n)) return n;
+  }
+  // Format api-sports
+  const apiSportsScore = (raw as ApiSportsHalftimeScore)?.score?.halftime;
+  if (apiSportsScore) {
+    const val = isHome ? apiSportsScore.home : apiSportsScore.away;
+    if (val !== null && val !== undefined) {
+      const n = Number(val);
+      if (!Number.isNaN(n)) return n;
+    }
+  }
+  return null;
+}
+
 export function computePressureIndex(
   statsPayload: Record<string, unknown> | null,
 ): number {
