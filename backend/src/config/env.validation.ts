@@ -121,9 +121,25 @@ class EnvironmentVariables {
   @IsOptional()
   @IsUrl()
   SLACK_ALERT_WEBHOOK_URL?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  ODDS_SYNC_ENABLED?: string = 'false';
+
+  @IsOptional()
+  @IsInt()
+  @Min(60000)
+  ODDS_PREMATCH_SYNC_INTERVAL_MS?: number = 3600000;
+
+  @IsOptional()
+  @IsInt()
+  @Min(10000)
+  ODDS_LIVE_SYNC_INTERVAL_MS?: number = 120000;
 }
 
-export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
+export function validateEnv(
+  config: Record<string, unknown>,
+): EnvironmentVariables {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
   });
@@ -135,7 +151,9 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
   if (errors.length > 0) {
     const messages = errors
       .map((error) => {
-        const constraints = error.constraints ? Object.values(error.constraints).join(', ') : 'invalid value';
+        const constraints = error.constraints
+          ? Object.values(error.constraints).join(', ')
+          : 'invalid value';
         return `${error.property}: ${constraints}`;
       })
       .join('; ');

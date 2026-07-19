@@ -65,7 +65,11 @@ export class ApiFootballClient {
       const batches = ids.slice(0, 20);
       const responses = await Promise.all(
         batches.map((id) =>
-          this.getApifootball('get_events', { match_id: id }, 'fixtures_by_ids'),
+          this.getApifootball(
+            'get_events',
+            { match_id: id },
+            'fixtures_by_ids',
+          ),
         ),
       );
       return responses.flatMap((data) => (Array.isArray(data) ? data : []));
@@ -176,7 +180,11 @@ export class ApiFootballClient {
       return Array.isArray(data) ? data : [];
     }
 
-    const data = await this.getApiSports('/teams', { league: leagueId }, 'teams_by_league');
+    const data = await this.getApiSports(
+      '/teams',
+      { league: leagueId },
+      'teams_by_league',
+    );
     return Array.isArray(data) ? data : [];
   }
 
@@ -226,10 +234,14 @@ export class ApiFootballClient {
     return Array.isArray(data) ? data : [];
   }
 
-  async fetchLeagueFixtures(leagueId: number, from?: string, to?: string): Promise<any[]> {
+  async fetchLeagueFixtures(
+    leagueId: number,
+    from?: string,
+    to?: string,
+  ): Promise<any[]> {
     const { seasonFrom, seasonTo, seasonYear } = this.currentSeasonRange();
     const dateFrom = from ?? seasonFrom;
-    const dateTo   = to   ?? seasonTo;
+    const dateTo = to ?? seasonTo;
     const timezone = this.configService.get<string>('API_FOOTBALL_TIMEZONE');
 
     if (this.provider === 'apifootball') {
@@ -255,16 +267,20 @@ export class ApiFootballClient {
   }
 
   /** Calcule la plage de la saison en cours (juillet → juin). */
-  private currentSeasonRange(): { seasonFrom: string; seasonTo: string; seasonYear: number } {
+  private currentSeasonRange(): {
+    seasonFrom: string;
+    seasonTo: string;
+    seasonYear: number;
+  } {
     const now = new Date();
     const month = now.getMonth() + 1; // 1-12
-    const year  = now.getFullYear();
+    const year = now.getFullYear();
     // Saison démarre en juillet : si on est juil-déc → saison year/(year+1), sinon (year-1)/year
     const seasonYear = month >= 7 ? year : year - 1;
     return {
       seasonYear,
       seasonFrom: `${seasonYear}-07-01`,
-      seasonTo:   `${seasonYear + 1}-06-30`,
+      seasonTo: `${seasonYear + 1}-06-30`,
     };
   }
 
@@ -293,11 +309,20 @@ export class ApiFootballClient {
    * Récupère toutes les cotes O/U live (sans filtre match).
    * Retourne une Map : providerMatchId → { ou05Over, ou05Under }
    */
-  async fetchAllLiveOdds(): Promise<Map<number, { ou05Over: number | null; ou05Under: number | null }>> {
+  async fetchAllLiveOdds(): Promise<
+    Map<number, { ou05Over: number | null; ou05Under: number | null }>
+  > {
     if (this.provider !== 'apifootball') return new Map();
     try {
-      const data = await this.getApifootball('get_live_odds_commnets', {}, 'live_odds_all');
-      const result = new Map<number, { ou05Over: number | null; ou05Under: number | null }>();
+      const data = await this.getApifootball(
+        'get_live_odds_commnets',
+        {},
+        'live_odds_all',
+      );
+      const result = new Map<
+        number,
+        { ou05Over: number | null; ou05Under: number | null }
+      >();
       if (!Array.isArray(data)) return result;
       for (const entry of data as Record<string, unknown>[]) {
         const id = this.toNumber(entry.match_id);
@@ -315,7 +340,9 @@ export class ApiFootballClient {
    * Extrait les cotes Over/Under 0.5 buts depuis un objet de réponse apifootball.
    * Tente plusieurs formats connus.
    */
-  private extractOU05Odds(entry: unknown): { ou05Over: number | null; ou05Under: number | null } | null {
+  private extractOU05Odds(
+    entry: unknown,
+  ): { ou05Over: number | null; ou05Under: number | null } | null {
     if (!entry || typeof entry !== 'object') return null;
     const obj = entry as Record<string, unknown>;
 
@@ -335,13 +362,18 @@ export class ApiFootballClient {
           if (label.includes('over 0.5') || label === 'over') over = n;
           if (label.includes('under 0.5') || label === 'under') under = n;
         }
-        if (over !== null || under !== null) return { ou05Over: over, ou05Under: under };
+        if (over !== null || under !== null)
+          return { ou05Over: over, ou05Under: under };
       }
     }
 
     // Format 2 : champs plats over / under
-    const overFlat = this.toNumber(obj['over_0_5'] ?? obj['over05'] ?? obj['over']);
-    const underFlat = this.toNumber(obj['under_0_5'] ?? obj['under05'] ?? obj['under']);
+    const overFlat = this.toNumber(
+      obj['over_0_5'] ?? obj['over05'] ?? obj['over'],
+    );
+    const underFlat = this.toNumber(
+      obj['under_0_5'] ?? obj['under05'] ?? obj['under'],
+    );
     if (overFlat !== null || underFlat !== null) {
       return { ou05Over: overFlat, ou05Under: underFlat };
     }
@@ -356,11 +388,72 @@ export class ApiFootballClient {
         { team_id: teamId },
         'team_by_id',
       );
-      return Array.isArray(data) ? data[0] ?? null : null;
+      return Array.isArray(data) ? (data[0] ?? null) : null;
     }
 
-    const data = await this.getApiSports('/teams', { id: teamId }, 'team_by_id');
-    return Array.isArray(data) ? data[0] ?? null : null;
+    const data = await this.getApiSports(
+      '/teams',
+      { id: teamId },
+      'team_by_id',
+    );
+    return Array.isArray(data) ? (data[0] ?? null) : null;
+  }
+
+  /** Provider actif, résolu au constructeur. Consommé par OddsIngestionService
+   * pour choisir le mapping adapté au format de réponse (apifootball vs api-sports). */
+  getProvider(): 'apisports' | 'apifootball' {
+    return this.provider;
+  }
+
+  /**
+   * Cotes pré-match.
+   * - apifootball : action `get_odds`, réponse = tableau plat, une ligne par
+   *   (match × bookmaker), champs 1X2/double chance/O-U/handicap asiatique/BTTS.
+   * - api-sports v3 : structure imbriquée response[].bookmakers[].bets[].values[].
+   */
+  async fetchPrematchOdds(providerFixtureId: number | string): Promise<any[]> {
+    if (this.provider === 'apifootball') {
+      const data = await this.getApifootball(
+        'get_odds',
+        { match_id: providerFixtureId },
+        'odds_prematch',
+      );
+      return Array.isArray(data) ? data : [];
+    }
+
+    const data = await this.getApiSports(
+      '/odds',
+      { fixture: providerFixtureId },
+      'odds_prematch',
+    );
+    return Array.isArray(data) ? data : [];
+  }
+
+  /**
+   * Cotes live.
+   * - apifootball : action `get_live_odds_commnets` (même action que
+   *   fetchLiveOddsForMatch/fetchAllLiveOdds, à ne pas modifier). Format non
+   *   validé sur données réelles ici (intersaison, aucun match live disponible
+   *   lors de l'implémentation) : la structure exacte reste à confirmer dès
+   *   qu'un match live sera observable.
+   * - api-sports v3 : même structure imbriquée que /odds.
+   */
+  async fetchLiveOdds(providerFixtureId: number | string): Promise<any[]> {
+    if (this.provider === 'apifootball') {
+      const data = await this.getApifootball(
+        'get_live_odds_commnets',
+        { match_id: providerFixtureId },
+        'odds_live',
+      );
+      return Array.isArray(data) ? data : [];
+    }
+
+    const data = await this.getApiSports(
+      '/odds/live',
+      { fixture: providerFixtureId },
+      'odds_live',
+    );
+    return Array.isArray(data) ? data : [];
   }
 
   private async getApiSports(
@@ -468,8 +561,6 @@ export class ApiFootballClient {
           }),
         );
 
-
-        
         await this.logUsage({
           endpoint: usageEndpoint,
           params,
@@ -531,7 +622,11 @@ export class ApiFootballClient {
     return payload;
   }
 
-  private shouldRetry(error: AxiosError, attempt: number, retryMax: number): boolean {
+  private shouldRetry(
+    error: AxiosError,
+    attempt: number,
+    retryMax: number,
+  ): boolean {
     if (attempt >= retryMax) {
       return false;
     }
@@ -688,7 +783,9 @@ export class ApiFootballClient {
     }
 
     const substitutions = match.substitutions ?? {};
-    const homeSubs = Array.isArray(substitutions.home) ? substitutions.home : [];
+    const homeSubs = Array.isArray(substitutions.home)
+      ? substitutions.home
+      : [];
     for (const sub of homeSubs) {
       events.push({
         team_id: homeTeamId,
@@ -700,7 +797,9 @@ export class ApiFootballClient {
         raw: sub,
       });
     }
-    const awaySubs = Array.isArray(substitutions.away) ? substitutions.away : [];
+    const awaySubs = Array.isArray(substitutions.away)
+      ? substitutions.away
+      : [];
     for (const sub of awaySubs) {
       events.push({
         team_id: awayTeamId,
