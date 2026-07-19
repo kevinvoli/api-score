@@ -232,6 +232,42 @@ describe('SmartSuggestionsService', () => {
       expect(recoRepo.delete).not.toHaveBeenCalled();
     });
 
+    it('ne recrée pas un coupon déjà résolu pour le même (fixture, équipe, marché)', async () => {
+      // Régression : la déduplication ne regardait que les PENDING — un coupon
+      // passé WON sortait du filtre et la même suggestion, toujours active au
+      // tick suivant, recréait indéfiniment le même pari (Majd FC observé ×4).
+      const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
+      const snap = makeStatsSnapshot(fixture.id, 10, 12);
+      setupEvaluateFixturesMocks([[fixture], []], [[snap]]);
+
+      // La règle 1re MT émet deux suggestions (mi-temps + match entier) :
+      // les deux paris existent déjà, résolus WON.
+      couponRepo.findBy.mockResolvedValue([
+        {
+          fixtureId: fixture.id,
+          teamId: 10,
+          marketType: 'Buts 1ère mi-temps',
+          status: 'WON',
+        },
+        {
+          fixtureId: fixture.id,
+          teamId: 10,
+          marketType: 'Buts match',
+          status: 'WON',
+        },
+      ]);
+      couponRepo.find.mockResolvedValue([]);
+      recoRepo.delete.mockResolvedValue({});
+      recoRepo.save.mockResolvedValue([]);
+
+      await service.evaluateAndSave();
+
+      expect(couponRepo.findBy).toHaveBeenCalledWith({
+        fixtureId: expect.anything(),
+      });
+      expect(couponRepo.save).not.toHaveBeenCalled();
+    });
+
     it('exécute resolveSettledCoupons même si la génération de suggestions échoue', async () => {
       // Forcer une erreur dans getAllSuggestions
       configService.getConfig.mockRejectedValue(new Error('DB error'));

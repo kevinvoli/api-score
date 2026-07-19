@@ -197,15 +197,15 @@ export class SmartSuggestionsService {
     if (!suggestions.length) return;
 
     const fixtureIds = [...new Set(suggestions.map((s) => s.fixtureId))];
-    const existingPending =
+    // Dédupliquer contre TOUS les statuts, pas seulement PENDING : un coupon
+    // résolu (WON/LOST) sortait du filtre et la même suggestion, toujours
+    // active au tick suivant, recréait indéfiniment le même pari.
+    const existing =
       (await this.couponRepo.findBy({
         fixtureId: In(fixtureIds),
-        status: 'PENDING',
       })) ?? [];
     const existingKeys = new Set(
-      existingPending.map(
-        (c) => `${c.fixtureId}|${c.teamId ?? ''}|${c.marketType}`,
-      ),
+      existing.map((c) => `${c.fixtureId}|${c.teamId ?? ''}|${c.marketType}`),
     );
 
     const toInsert = suggestions
