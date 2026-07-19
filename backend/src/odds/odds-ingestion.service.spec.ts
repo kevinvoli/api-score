@@ -329,47 +329,49 @@ describe('OddsIngestionService', () => {
     });
   });
 
-  describe('sélection des fixtures selon le provider', () => {
-    it('utilise le code de statut api-sports NS en mode apisports', async () => {
-      apiClient.getProvider.mockReturnValue('apisports');
+  describe('sélection des fixtures (vocabulaire normalisé)', () => {
+    // Régression M1 : la sélection filtrait sur les libellés BRUTS apifootball
+    // ('', 'Half Time', minutes en regex) alors que normalizeApifootballStatus
+    // écrit en base le vocabulaire api-sports (NS/HT/LIVE/FT). Le prématch ne
+    // sélectionnait jamais rien et la mi-temps était exclue du live — quel que
+    // soit le provider, on filtre désormais sur les valeurs normalisées.
+    it('prématch : sélectionne les fixtures NS (statut normalisé, tous providers)', async () => {
       fixtureRepo._qb.getMany.mockResolvedValue([]);
 
       await service.syncPrematchOdds();
 
-      expect(fixtureRepo._qb.where).toHaveBeenCalledWith(
-        'fixture.statusShort = :status',
-        { status: 'NS' },
-      );
+      const [clause, params] = fixtureRepo._qb.where.mock.calls.at(-1);
+      expect(clause).not.toContain("''");
+      expect(params).toEqual({ status: 'NS' });
     });
 
-    it('cible le statut vide en mode apifootball (NS n_existe pas chez ce provider)', async () => {
-      apiClient.getProvider.mockReturnValue('apifootball');
-      fixtureRepo._qb.getMany.mockResolvedValue([]);
-
-      await service.syncPrematchOdds();
-
-      const [clause] = fixtureRepo._qb.where.mock.calls.at(-1);
-      expect(clause).toContain("fixture.statusShort = ''");
-      expect(clause).toContain('IS NULL');
-    });
-
-    it('inclut les statuts apifootball en toutes lettres et les minutes en cours', async () => {
-      apiClient.getProvider.mockReturnValue('apifootball');
+    it('live : inclut HT (mi-temps) et LIVE, jamais les libellés bruts apifootball', async () => {
       fixtureRepo._qb.getMany.mockResolvedValue([]);
 
       await service.syncLiveOdds();
 
       const [clause, params] = fixtureRepo._qb.where.mock.calls.at(-1);
-      expect(clause).toContain('REGEXP');
-      expect(params.statuses).toEqual(['LIVE', 'Half Time']);
+      expect(clause).not.toContain('REGEXP');
+      expect(params.statuses).toEqual(
+        expect.arrayContaining(['LIVE', 'HT', '1H', '2H']),
+      );
+      expect(params.statuses).not.toContain('Half Time');
+      expect(params.statuses).not.toContain('Finished');
+      expect(params.statuses).not.toContain('FT');
+    });
 
-      // '90+', '45+' et les minutes nues ('23') doivent matcher ; pas 'Finished'.
-      const re = new RegExp(params.minute);
-      expect(re.test('90+')).toBe(true);
-      expect(re.test('45+')).toBe(true);
-      expect(re.test('23')).toBe(true);
-      expect(re.test('Finished')).toBe(false);
-      expect(re.test('Interrupted')).toBe(false);
+    it('la sélection est identique quel que soit le provider résolu', async () => {
+      fixtureRepo._qb.getMany.mockResolvedValue([]);
+
+      apiClient.getProvider.mockReturnValue('apifootball');
+      await service.syncLiveOdds();
+      const apifootballCall = fixtureRepo._qb.where.mock.calls.at(-1);
+
+      apiClient.getProvider.mockReturnValue('apisports');
+      await service.syncLiveOdds();
+      const apisportsCall = fixtureRepo._qb.where.mock.calls.at(-1);
+
+      expect(apifootballCall).toEqual(apisportsCall);
     });
   });
 });

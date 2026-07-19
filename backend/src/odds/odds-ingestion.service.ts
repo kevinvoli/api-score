@@ -14,16 +14,12 @@ import { impliedProbability, removeMargin } from './odds-math';
 
 type Phase = 'PREMATCH' | 'LIVE';
 
-// Les deux providers n'emploient pas les mêmes codes de statut. api-sports
-// utilise des codes courts ('NS', '1H', 'HT'...) ; apifootball renvoie des
-// libellés ('Finished', 'Half Time', 'Interrupted'), la minute courante en
-// clair ('23', '88') ou un temps additionnel ('45+', '90+'), et la chaîne vide
-// pour un match non démarré.
-const LIVE_STATUSES_APISPORTS = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE', 'BT'];
-const LIVE_STATUSES_APIFOOTBALL = ['LIVE', 'Half Time'];
-
-// Minute en cours, avec ou sans temps additionnel : '23', '45+', '90+'.
-const APIFOOTBALL_LIVE_MINUTE_PATTERN = '^[0-9]+[+]?$';
+// La sélection filtre sur les statuts NORMALISÉS : quel que soit le provider,
+// normalizeApifootballStatus (fixtures-ingestion) écrit en base le vocabulaire
+// api-sports ('' → NS, minute/'45+'/'90+' → LIVE, 'Half Time' → HT,
+// 'Finished' → FT). Ne jamais filtrer ici sur les libellés bruts apifootball.
+const PREMATCH_STATUS = 'NS';
+const LIVE_STATUSES = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE', 'BT'];
 
 interface OddsOutcome {
   outcome: string;
@@ -58,38 +54,21 @@ export class OddsIngestionService {
   }
 
   private async getUpcomingFixtures(): Promise<Fixture[]> {
-    const qb = this.fixtureRepository
+    return this.fixtureRepository
       .createQueryBuilder('fixture')
+      .where('fixture.statusShort = :status', { status: PREMATCH_STATUS })
       .orderBy('fixture.matchDate', 'ASC')
-      .take(50);
-
-    if (this.apiFootballClient.getProvider() === 'apifootball') {
-      qb.where("(fixture.statusShort = '' OR fixture.statusShort IS NULL)");
-    } else {
-      qb.where('fixture.statusShort = :status', { status: 'NS' });
-    }
-
-    return qb.getMany();
+      .take(50)
+      .getMany();
   }
 
   private async getLiveFixtures(): Promise<Fixture[]> {
-    const qb = this.fixtureRepository.createQueryBuilder('fixture');
-
-    if (this.apiFootballClient.getProvider() === 'apifootball') {
-      qb.where(
-        '(fixture.statusShort IN (:...statuses) OR fixture.statusShort REGEXP :minute)',
-        {
-          statuses: LIVE_STATUSES_APIFOOTBALL,
-          minute: APIFOOTBALL_LIVE_MINUTE_PATTERN,
-        },
-      );
-    } else {
-      qb.where('fixture.statusShort IN (:...statuses)', {
-        statuses: LIVE_STATUSES_APISPORTS,
-      });
-    }
-
-    return qb.getMany();
+    return this.fixtureRepository
+      .createQueryBuilder('fixture')
+      .where('fixture.statusShort IN (:...statuses)', {
+        statuses: LIVE_STATUSES,
+      })
+      .getMany();
   }
 
   private async syncOddsForFixtures(
