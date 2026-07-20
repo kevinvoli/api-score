@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsInt,
   IsNumber,
@@ -9,32 +11,70 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-export class SmartRuleItemDto {
+/** Fenêtre de déclenchement : « avant maxElapsed minutes, au moins minShots tirs ». */
+export class HalfRuleDto {
   @IsInt()
   @Min(1)
-  @Max(90)
-  minute: number;
+  @Max(120)
+  maxElapsed: number;
 
   @IsInt()
-  @Min(0)
-  shotsThreshold: number;
+  @Min(1)
+  @Max(50)
+  minShots: number;
+}
+
+/** Cote de référence indicative et seuils d'affichage associés à un marché. */
+export class OddsConfigDto {
+  @IsNumber()
+  @Min(1.01)
+  @Max(50)
+  current: number;
 
   @IsNumber()
   @Min(1.01)
   @Max(50)
-  odds: number;
+  min: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  edgePct: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  confidence: number;
+}
+
+export class OddsSettingsDto {
+  @ValidateNested()
+  @Type(() => OddsConfigDto)
+  firstHalfHT: OddsConfigDto;
+
+  @ValidateNested()
+  @Type(() => OddsConfigDto)
+  firstHalfFT: OddsConfigDto;
+
+  @ValidateNested()
+  @Type(() => OddsConfigDto)
+  secondHalf: OddsConfigDto;
 }
 
 export class UpdateSmartRulesDto {
-  @IsOptional()
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
   @ValidateNested({ each: true })
-  @Type(() => SmartRuleItemDto)
-  firstHalfRules?: SmartRuleItemDto[];
+  @Type(() => HalfRuleDto)
+  firstHalfRules: HalfRuleDto[];
+
+  @ValidateNested()
+  @Type(() => HalfRuleDto)
+  secondHalfRule: HalfRuleDto;
 
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => SmartRuleItemDto)
-  secondHalfRules?: SmartRuleItemDto[];
+  @ValidateNested()
+  @Type(() => OddsSettingsDto)
+  odds?: OddsSettingsDto;
 }
