@@ -135,6 +135,23 @@ class EnvironmentVariables {
   @IsInt()
   @Min(10000)
   ODDS_LIVE_SYNC_INTERVAL_MS?: number = 120000;
+
+  /**
+   * Rétention des données analytiques (fixtures et, par cascade, snapshots et
+   * événements). Défaut 3 saisons : c'est la matière première des taux de base
+   * et du backtest. Le plancher de 365 jours évite de reproduire l'incident du
+   * 20/07/2026, où une rétention à 90 jours a effacé tout l'historique.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(365)
+  DATA_RETENTION_DAYS?: number = 1095;
+
+  /** Rétention des payloads bruts du provider : volumineux et réimportables. */
+  @IsOptional()
+  @IsInt()
+  @Min(7)
+  PAYLOAD_RETENTION_DAYS?: number = 90;
 }
 
 export function validateEnv(

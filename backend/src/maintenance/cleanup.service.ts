@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { In, LessThan, Repository } from 'typeorm';
@@ -8,10 +9,14 @@ import { Fixture } from '../database/entities/fixture.entity';
 import { SmartCoupon } from '../database/entities/smart-coupon.entity';
 import { JsonLogger } from '../common/json.logger';
 
+/** Au-delà de ce volume, une suppression est journalisée en warn avant exécution. */
+const MASS_DELETION_THRESHOLD = 1000;
+
 @Injectable()
 export class CleanupService {
   constructor(
     private readonly logger: JsonLogger,
+    private readonly configService: ConfigService,
     @InjectRepository(ApiFootballPayload)
     private readonly payloadRepository: Repository<ApiFootballPayload>,
     @InjectRepository(Fixture)
@@ -22,28 +27,76 @@ export class CleanupService {
     private readonly couponRepository: Repository<SmartCoupon>,
   ) {}
 
+  /**
+   * Deux rétentions distinctes, et c'est délibéré :
+   *  - les payloads bruts sont volumineux et réimportables depuis le provider ;
+   *  - les fixtures (et par cascade snapshots et événements) sont la matière
+   *    première des taux de base et du backtest. Les purger tôt revient à
+   *    détruire la valeur analytique du produit — c'est exactement ce qui s'est
+   *    produit le 20/07/2026 avec une rétention unique de 90 jours.
+   */
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async cleanupOldData(): Promise<void> {
-    const retentionDays = 90;
-    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const dataRetentionDays = this.configService.get<number>(
+      'DATA_RETENTION_DAYS',
+      1095,
+    );
+    const payloadRetentionDays = this.configService.get<number>(
+      'PAYLOAD_RETENTION_DAYS',
+      90,
+    );
 
-    const payloadResult = await this.payloadRepository.delete({
-      fetchedAt: LessThan(cutoff),
-    });
+    const payloadsDeleted = await this.deleteWithGuard(
+      'api_football_payloads',
+      this.payloadRepository,
+      { fetchedAt: LessThan(this.cutoff(payloadRetentionDays)) },
+    );
 
-    const fixturesResult = await this.fixtureRepository.delete({
-      matchDate: LessThan(cutoff),
-    });
+    const fixturesDeleted = await this.deleteWithGuard(
+      'fixtures',
+      this.fixtureRepository,
+      { matchDate: LessThan(this.cutoff(dataRetentionDays)) },
+    );
 
     this.logger.log(
       {
         event: 'cleanup_completed',
-        retentionDays,
-        payloadsDeleted: payloadResult.affected ?? 0,
-        fixturesDeleted: fixturesResult.affected ?? 0,
+        dataRetentionDays,
+        payloadRetentionDays,
+        payloadsDeleted,
+        fixturesDeleted,
       },
       'CleanupService',
     );
+  }
+
+  private cutoff(days: number): Date {
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * Compte avant de supprimer : une purge massive est le genre d'opération qui
+   * passe inaperçue jusqu'à ce qu'on cherche les données disparues.
+   */
+  private async deleteWithGuard<T extends object>(
+    table: string,
+    repository: Repository<T>,
+    criteria: Parameters<Repository<T>['delete']>[0],
+  ): Promise<number> {
+    const affected = await repository.count({
+      where: criteria as Parameters<Repository<T>['count']>[0]['where'],
+    });
+    if (affected === 0) return 0;
+
+    if (affected >= MASS_DELETION_THRESHOLD) {
+      this.logger.warn(
+        { event: 'cleanup_mass_deletion', table, rows: affected },
+        'CleanupService',
+      );
+    }
+
+    const result = await repository.delete(criteria);
+    return result.affected ?? 0;
   }
 
   /**
