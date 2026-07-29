@@ -417,37 +417,6 @@ describe('FixturesIngestionService', () => {
     });
   });
 
-  describe('normalizeApifootballStatus()', () => {
-    const norm = (raw: string | null | undefined) =>
-      (
-        service as unknown as {
-          normalizeApifootballStatus: (
-            r: string | null | undefined,
-          ) => string | null;
-        }
-      ).normalizeApifootballStatus(raw);
-
-    it('mappe les libellés terminaux vers les codes attendus par la résolution', () => {
-      // Sans ces deux mappings, la branche LOST de resolveCouponOutcome est
-      // inatteignable et le taux de réussite des coupons vaut toujours 100 %.
-      expect(norm('Finished')).toBe('FT');
-      expect(norm('Half Time')).toBe('HT');
-    });
-
-    it('normalise les minutes, y compris le temps additionnel sans chiffre', () => {
-      expect(norm('75')).toBe('LIVE');
-      expect(norm('45+2')).toBe('LIVE');
-      expect(norm('90+')).toBe('LIVE');
-      expect(norm('45+')).toBe('LIVE');
-    });
-
-    it('conserve les autres conventions existantes', () => {
-      expect(norm('')).toBe('NS');
-      expect(norm('Cancelled')).toBe('CANC');
-      expect(norm('Interrupted')).toBe('INT');
-      expect(norm('Pen.')).toBe('PEN');
-      expect(norm(null)).toBeNull();
-      expect(norm('FT')).toBe('FT');
-    });
-  });
+  // normalizeApifootballStatus() est extrait dans common/utils/status.utils.spec.ts
+  // depuis le 20/07/2026 (partagé avec l'import historique).
 });

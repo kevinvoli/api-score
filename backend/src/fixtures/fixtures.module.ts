@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ApiFootballPayload } from '../database/entities/api-football-payload.entity';
-import { ApiUsageLog } from '../database/entities/api-usage-log.entity';
 import { FixtureEvent } from '../database/entities/fixture-event.entity';
 import { FixtureLineup } from '../database/entities/fixture-lineup.entity';
 import { FixturePlayerStatsSnapshot } from '../database/entities/fixture-player-stats-snapshot.entity';
@@ -25,7 +24,6 @@ import { ProviderPersistenceService } from './provider-persistence.service';
     ProviderApiFootballModule,
     RecommendationsModule,
     TypeOrmModule.forFeature([
-      ApiUsageLog,
       ApiFootballPayload,
       Fixture,
       FixtureEvent,

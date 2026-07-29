@@ -12,6 +12,7 @@ import { Team } from '../database/entities/team.entity';
 import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
 import { GetLiveFixturesQueryDto } from './dto/get-live-fixtures-query.dto';
 import { toNumber, computePressureIndex } from '../common/utils/stats.utils';
+import { normalizeFixturePayload } from '../common/utils/fixture-payload.utils';
 
 @Injectable()
 export class FixturesIngestionService {
@@ -503,7 +504,7 @@ export class FixturesIngestionService {
   private async upsertFixture(
     payload: Record<string, any>,
   ): Promise<Fixture | null> {
-    const normalized = this.normalizeFixturePayload(payload);
+    const normalized = normalizeFixturePayload(payload);
     if (!normalized.providerFixtureId) {
       return null;
     }
@@ -803,117 +804,6 @@ export class FixturesIngestionService {
 
     await this.fixturePlayerStatsSnapshotRepository.insert(rows);
     return rows.length;
-  }
-
-  private normalizeFixturePayload(payload: Record<string, any>): {
-    providerFixtureId: string | null;
-    leagueId: number | null;
-    leagueName: string | null;
-    season: number | null;
-    homeTeamId: number | null;
-    awayTeamId: number | null;
-    homeTeamName: string | null;
-    awayTeamName: string | null;
-    homeTeamBadge: string | null;
-    awayTeamBadge: string | null;
-    statusShort: string | null;
-    statusLong: string | null;
-    elapsed: number | null;
-    matchDate: Date | null;
-    scoreHome: number | null;
-    scoreAway: number | null;
-  } {
-    const apiSportsFixture = payload?.fixture ?? null;
-    const legacyFixtureId = payload?.match_id ? String(payload.match_id) : null;
-    const providerFixtureId = apiSportsFixture?.id
-      ? String(apiSportsFixture.id)
-      : legacyFixtureId;
-
-    return {
-      providerFixtureId,
-      leagueId: payload?.league?.id ?? toNumber(payload?.league_id) ?? null,
-      leagueName:
-        payload?.league?.name ??
-        payload?.league?.league_name ??
-        payload?.league_name ??
-        null,
-      season: payload?.league?.season ?? toNumber(payload?.league_year) ?? null,
-      homeTeamId:
-        payload?.teams?.home?.id ??
-        toNumber(payload?.match_hometeam_id) ??
-        null,
-      awayTeamId:
-        payload?.teams?.away?.id ??
-        toNumber(payload?.match_awayteam_id) ??
-        null,
-      homeTeamName:
-        payload?.teams?.home?.name ?? payload?.match_hometeam_name ?? null,
-      awayTeamName:
-        payload?.teams?.away?.name ?? payload?.match_awayteam_name ?? null,
-      homeTeamBadge:
-        payload?.teams?.home?.logo ?? payload?.team_home_badge ?? null,
-      awayTeamBadge:
-        payload?.teams?.away?.logo ?? payload?.team_away_badge ?? null,
-      statusShort:
-        apiSportsFixture?.status?.short ??
-        this.normalizeApifootballStatus(payload?.match_status),
-      statusLong:
-        apiSportsFixture?.status?.long ?? payload?.match_status ?? null,
-      elapsed:
-        apiSportsFixture?.status?.elapsed ??
-        toNumber(payload?.match_status) ??
-        null,
-      matchDate: apiSportsFixture?.date
-        ? new Date(apiSportsFixture.date)
-        : this.toDate(payload?.match_date),
-      scoreHome:
-        payload?.goals?.home ?? toNumber(payload?.match_hometeam_score) ?? null,
-      scoreAway:
-        payload?.goals?.away ?? toNumber(payload?.match_awayteam_score) ?? null,
-    };
-  }
-
-  private toDate(value: unknown): Date | null {
-    if (!value || typeof value !== 'string') {
-      return null;
-    }
-
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  /**
-   * Normalise le champ match_status d'apifootball.com en code api-sports standard.
-   * - ""          → "NS"   (Not Started)
-   * - "75" etc.   → "LIVE" (en cours, la valeur numérique = minutes écoulées)
-   * - "HT","FT","AET","ET","P","1H","2H" → inchangés (déjà compatibles)
-   * - "Cancelled" → "CANC", "Postponed" → "PST", etc.
-   */
-  private normalizeApifootballStatus(
-    raw: string | null | undefined,
-  ): string | null {
-    if (raw === null || raw === undefined) return null;
-    if (raw === '') return 'NS';
-    // "75", "45+2", mais aussi "90+" / "45+" (le + peut n'être suivi d'aucun
-    // chiffre) : sans le `?`, ces deux formes traversaient sans être normalisées.
-    if (/^\d+(\+\d*)?$/.test(raw)) return 'LIVE';
-    const MAP: Record<string, string> = {
-      // Sans ces deux entrées, 'Finished'/'Half Time' traversaient tels quels
-      // (MAP[raw] ?? raw) et ne correspondaient à aucun code attendu par la
-      // résolution des coupons : la branche LOST devenait inatteignable.
-      Finished: 'FT',
-      'Half Time': 'HT',
-      Cancelled: 'CANC',
-      Postponed: 'PST',
-      Interrupted: 'INT',
-      Abandoned: 'ABD',
-      Awarded: 'AWD',
-      Suspended: 'SUSP',
-      'Not Coverage': 'NS',
-      // apifootball termine parfois les matchs aux tirs au but avec 'Pen.'
-      'Pen.': 'PEN',
-    };
-    return MAP[raw] ?? raw;
   }
 
   private keepLatestSnapshotRows<T extends { snapshotAt: Date }>(

@@ -1,10 +1,8 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThanOrEqual, Repository } from 'typeorm';
 import { JsonLogger } from '../common/json.logger';
-import { ApiUsageLog } from '../database/entities/api-usage-log.entity';
+import { RateBudgetService } from '../common/services/rate-budget.service';
 import { FixturesIngestionService } from './fixtures-ingestion.service';
 import { SmartSuggestionsService } from '../recommendations/smart-suggestions.service';
 
@@ -24,8 +22,7 @@ export class FixturesSyncScheduler implements OnModuleInit, OnModuleDestroy {
     private readonly fixturesIngestionService: FixturesIngestionService,
     private readonly smartSuggestionsService: SmartSuggestionsService,
     private readonly logger: JsonLogger,
-    @InjectRepository(ApiUsageLog)
-    private readonly apiUsageLogRepository: Repository<ApiUsageLog>,
+    private readonly rateBudgetService: RateBudgetService,
   ) {}
 
   onModuleInit(): void {
@@ -94,7 +91,7 @@ export class FixturesSyncScheduler implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const quotaOk = await this.hasRateBudget();
+    const quotaOk = await this.rateBudgetService.hasBudget();
     if (!quotaOk) {
       this.logger.warn(
         {
@@ -184,26 +181,5 @@ export class FixturesSyncScheduler implements OnModuleInit, OnModuleDestroy {
     this.pausedUntil = null;
     this.logger.log({ event: 'job_state_resumed' }, 'FixturesSyncScheduler');
     return true;
-  }
-
-  private async hasRateBudget(): Promise<boolean> {
-    const perMinuteLimit = this.configService.get<number>(
-      'RATE_LIMIT_PER_MIN',
-      300,
-    );
-    const headroomPct = this.configService.get<number>(
-      'SYNC_RATE_LIMIT_HEADROOM_PCT',
-      90,
-    );
-    const budget = Math.floor((perMinuteLimit * headroomPct) / 100);
-    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
-
-    const callsLastMinute = await this.apiUsageLogRepository.count({
-      where: {
-        calledAt: MoreThanOrEqual(oneMinuteAgo),
-      },
-    });
-
-    return callsLastMinute < budget;
   }
 }

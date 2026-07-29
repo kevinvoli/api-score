@@ -8,6 +8,8 @@ import { Repository } from 'typeorm';
 import { JsonLogger } from '../../common/json.logger';
 import { ApiUsageLog } from '../../database/entities/api-usage-log.entity';
 import { ApiFootballPayload } from '../../database/entities/api-football-payload.entity';
+import { buildTeamStatsEntries } from '../../common/utils/stats.utils';
+import { formatDateOnly } from '../../common/utils/date.utils';
 
 type QueryParams = Record<string, unknown>;
 
@@ -713,10 +715,7 @@ export class ApiFootballClient {
   }
 
   private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return formatDateOnly(date);
   }
 
   private normalizeApifootballEvents(match: Record<string, any> | null): any[] {
@@ -827,25 +826,15 @@ export class ApiFootballClient {
     const match =
       (payload as Record<string, any>)[String(fixtureId)] ??
       (payload as Record<string, any>)[fixtureId];
-    if (!match || !Array.isArray(match.statistics)) {
+    if (!match) {
       return [];
     }
 
-    const homeTeamId = teamIds?.homeTeamId ?? null;
-    const awayTeamId = teamIds?.awayTeamId ?? null;
-    const homeStats = match.statistics.map((stat: Record<string, any>) => ({
-      type: stat.type,
-      value: stat.home,
-    }));
-    const awayStats = match.statistics.map((stat: Record<string, any>) => ({
-      type: stat.type,
-      value: stat.away,
-    }));
-
-    return [
-      { team_id: homeTeamId, statistics: homeStats },
-      { team_id: awayTeamId, statistics: awayStats },
-    ];
+    return buildTeamStatsEntries(
+      match.statistics,
+      teamIds?.homeTeamId ?? null,
+      teamIds?.awayTeamId ?? null,
+    );
   }
 
   private normalizeApifootballLineups(

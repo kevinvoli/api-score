@@ -21,7 +21,8 @@
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "db:migrate": "npm run typeorm -- migration:run",
     "db:migrate:revert": "npm run typeorm -- migration:revert",
-    "persist:provider": "ts-node -r tsconfig-paths/register src/scripts/replay-provider-payloads.ts"
+    "persist:provider": "ts-node -r tsconfig-paths/register src/scripts/replay-provider-payloads.ts",
+    "import:history": "ts-node -r tsconfig-paths/register src/scripts/import-history.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^3.1.3",

@@ -12,6 +12,7 @@ import { FixtureLineup } from './fixture-lineup.entity';
 import { FixturePlayerStatsSnapshot } from './fixture-player-stats-snapshot.entity';
 import { FixtureStatsSnapshot } from './fixture-stats-snapshot.entity';
 import { League } from './league.entity';
+import { LeagueWatchlist } from './league-watchlist.entity';
 import { Match } from './match.entity';
 import { OddsSnapshot } from './odds-snapshot.entity';
 import { SmartCoupon } from './smart-coupon.entity';
@@ -33,6 +34,7 @@ export const ALL_ENTITIES = [
   FixturePlayerStatsSnapshot,
   FixtureStatsSnapshot,
   League,
+  LeagueWatchlist,
   Match,
   OddsSnapshot,
   SmartCoupon,

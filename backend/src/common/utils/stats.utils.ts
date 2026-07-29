@@ -111,6 +111,51 @@ export function extractHtScore(
   return null;
 }
 
+export interface RawTeamStatEntry {
+  type?: string;
+  home?: unknown;
+  away?: unknown;
+}
+
+export interface TeamStatsEntry {
+  team_id: number | null;
+  statistics: Array<{ type: string | undefined; value: unknown }>;
+}
+
+/**
+ * Répartit un tableau de stats `{type, home, away}` (format apifootball,
+ * partagé par get_statistics ET get_events) en une entrée par équipe,
+ * `{team_id, statistics: [{type, value}]}` — la forme persistée dans
+ * `fixture_stats_snapshots.stats`. Partagé entre ApiFootballClient (live) et
+ * HistoryImportService (historique) pour garantir une forme identique.
+ */
+export function buildTeamStatsEntries(
+  statistics: RawTeamStatEntry[] | undefined,
+  homeTeamId: number | null,
+  awayTeamId: number | null,
+): TeamStatsEntry[] {
+  if (!Array.isArray(statistics) || !statistics.length) {
+    return [];
+  }
+
+  return [
+    {
+      team_id: homeTeamId,
+      statistics: statistics.map((stat) => ({
+        type: stat.type,
+        value: stat.home,
+      })),
+    },
+    {
+      team_id: awayTeamId,
+      statistics: statistics.map((stat) => ({
+        type: stat.type,
+        value: stat.away,
+      })),
+    },
+  ];
+}
+
 export function computePressureIndex(
   statsPayload: Record<string, unknown> | null,
 ): number {
