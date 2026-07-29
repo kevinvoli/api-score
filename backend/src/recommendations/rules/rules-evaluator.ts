@@ -26,6 +26,8 @@ export interface RuleMatch {
   minAcceptableOdd: number;
   edgePct: number;
   confidenceScore: number;
+  /** Seuil de tirs (`minShots`) de la règle déclenchée — clé de lookup du taux de base. */
+  signalThreshold: number;
   reasons: string[];
   elapsed: number;
   shotsCount: number;
@@ -83,6 +85,7 @@ function evaluateFirstHalf(
       minAcceptableOdd: oddsHT.min,
       edgePct: oddsHT.edgePct,
       confidenceScore: oddsHT.confidence,
+      signalThreshold: matchedRule.minShots,
       reasons: [
         `${shots} tirs à ${input.elapsed}' (seuil : ≥${matchedRule.minShots} avant ${matchedRule.maxElapsed}')`,
         'Forte pression offensive',
@@ -103,6 +106,7 @@ function evaluateFirstHalf(
       minAcceptableOdd: oddsFT.min,
       edgePct: oddsFT.edgePct,
       confidenceScore: oddsFT.confidence,
+      signalThreshold: matchedRule.minShots,
       reasons: [
         `${shots} tirs à ${input.elapsed}' (seuil : ≥${matchedRule.minShots} avant ${matchedRule.maxElapsed}')`,
         'Domination offensive confirmée',
@@ -154,6 +158,7 @@ function evaluateSecondHalf(
       minAcceptableOdd: odds.min,
       edgePct: odds.edgePct,
       confidenceScore: odds.confidence,
+      signalThreshold: matchedRule.minShots,
       reasons: [
         `${shots} tirs en 2MT à ${input.elapsed}' (seuil : ≥${matchedRule.minShots} avant ${matchedRule.maxElapsed}')`,
         'Pression offensive confirmée en 2ème mi-temps',

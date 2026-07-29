@@ -6,7 +6,8 @@ export type Recommendation = {
   currentOdd: number;
   minAcceptableOdd: number;
   edgePct: number;
-  confidenceScore: number;
+  confidenceScore: number | null;
+  baseRateSampleSize: number | null;
   reasons: string[];
   riskFlags: string[];
   status?: 'NEW' | 'ACTIVE' | 'REJECTED';

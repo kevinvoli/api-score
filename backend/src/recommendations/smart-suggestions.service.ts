@@ -24,6 +24,11 @@ import {
   ResolvableBet,
   FinalMatchState,
 } from './rules/outcome-resolver';
+import {
+  BaseRatesService,
+  MARKET_TYPE_TO_BASE_RATE,
+  baseRateKey,
+} from '../analytics/base-rates.service';
 
 export type SmartSuggestion = {
   id: string;
@@ -34,7 +39,10 @@ export type SmartSuggestion = {
   currentOdd: number;
   minAcceptableOdd: number;
   edgePct: number;
-  confidenceScore: number;
+  /** Taux de base réel (%) du LOT 2, ou `null` si aucun échantillon suffisant — plus jamais inventé. */
+  confidenceScore: number | null;
+  /** Taille d'échantillon du taux de base ci-dessus (à afficher à côté). */
+  baseRateSampleSize: number | null;
   reasons: string[];
   riskFlags: string[];
   status: 'NEW';
@@ -71,6 +79,7 @@ export class SmartSuggestionsService {
     private readonly couponRepo: Repository<SmartCoupon>,
     private readonly configService: SmartRulesConfigService,
     private readonly apiClient: ApiFootballClient,
+    private readonly baseRatesService: BaseRatesService,
     private readonly logger: JsonLogger,
   ) {}
 
@@ -116,6 +125,7 @@ export class SmartSuggestionsService {
               minAcceptableOdd: s.minAcceptableOdd,
               edgePct: s.edgePct,
               confidenceScore: s.confidenceScore,
+              baseRateSampleSize: s.baseRateSampleSize,
               reasons: s.reasons,
               riskFlags: [],
               status: 'NEW',
@@ -189,6 +199,7 @@ export class SmartSuggestionsService {
           minAcceptableOdd: s.minAcceptableOdd,
           edgePct: s.edgePct,
           confidenceScore: s.confidenceScore,
+          baseRateSampleSize: s.baseRateSampleSize,
           reasons: s.reasons,
           ruleName: s.ruleName,
           elapsedAtSuggestion: s.elapsed,
@@ -371,6 +382,15 @@ export class SmartSuggestionsService {
       .orderBy('s.snapshotAt', 'DESC')
       .getMany();
 
+    // Taux de base préchargés (LOT 2) : une requête pour tout le lot de fixtures.
+    const baseRatePairs = fixtures
+      .filter((f) => f.leagueId !== null && f.season !== null)
+      .map((f) => ({ leagueId: f.leagueId!, season: f.season! }));
+    const baseRateLookup = await this.baseRatesService.buildLookup(
+      baseRatePairs,
+      'total_shots',
+    );
+
     // Snapshot le plus récent par (fixtureId, teamId)
     const latestByTeam = new Map<string, Map<number, FixtureStatsSnapshot>>();
     for (const snap of allSnapshots) {
@@ -438,6 +458,12 @@ export class SmartSuggestionsService {
       for (const [teamId, teamMatches] of matchesByTeam) {
         const idBase = `smart-${halfSuffix}-${fixture.id}-${teamId}`;
         teamMatches.forEach((match, index) => {
+          const baseRate = this.resolveBaseRate(
+            fixture,
+            match.marketType,
+            match.signalThreshold,
+            baseRateLookup,
+          );
           suggestions.push({
             id: `${idBase}-${index === 0 ? 'a' : 'b'}`,
             fixtureId: fixture.id,
@@ -447,7 +473,8 @@ export class SmartSuggestionsService {
             currentOdd: match.currentOdd,
             minAcceptableOdd: match.minAcceptableOdd,
             edgePct: match.edgePct,
-            confidenceScore: match.confidenceScore,
+            confidenceScore: baseRate.confidenceScore,
+            baseRateSampleSize: baseRate.sampleSize,
             reasons: match.reasons,
             riskFlags: [],
             status: 'NEW',
@@ -463,5 +490,34 @@ export class SmartSuggestionsService {
     }
 
     return suggestions;
+  }
+
+  /**
+   * Confiance = taux de base réel du LOT 2 (en %), jamais une constante inventée.
+   * `null` si le championnat/saison n'a pas d'échantillon suffisant pour ce
+   * marché à ce seuil de tirs.
+   */
+  private resolveBaseRate(
+    fixture: Fixture,
+    marketType: string,
+    signalThreshold: number,
+    lookup: Map<string, { observedRate: number; sampleSize: number }>,
+  ): { confidenceScore: number | null; sampleSize: number | null } {
+    const market = MARKET_TYPE_TO_BASE_RATE[marketType];
+    if (!market || fixture.leagueId === null || fixture.season === null) {
+      return { confidenceScore: null, sampleSize: null };
+    }
+
+    const hit = lookup.get(
+      baseRateKey(fixture.leagueId, fixture.season, market, signalThreshold),
+    );
+    if (!hit) {
+      return { confidenceScore: null, sampleSize: null };
+    }
+
+    return {
+      confidenceScore: Math.round(hit.observedRate * 100),
+      sampleSize: hit.sampleSize,
+    };
   }
 }

@@ -30,6 +30,22 @@ function toDate(value: unknown): Date | null {
 }
 
 /**
+ * apifootball renvoie `league_year` sous la forme `'2025/2026'` (chaîne), que
+ * `toNumber` transformait en NaN → saison perdue. On retient l'année de début.
+ * Accepte aussi `'2025-2026'`, `'2025'` et un nombre brut (api-sports).
+ */
+export function parseSeasonYear(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string') {
+    const match = /\d{4}/.exec(value);
+    return match ? Number(match[0]) : null;
+  }
+  return null;
+}
+
+/**
  * Mappe un payload fixture provider (api-sports imbriqué ou apifootball à
  * plat) vers la forme normalisée persistée dans `fixtures`. Extrait de
  * FixturesIngestionService le 20/07/2026 pour être partagé avec l'import
@@ -53,7 +69,10 @@ export function normalizeFixturePayload(
       payload?.league?.league_name ??
       payload?.league_name ??
       null,
-    season: payload?.league?.season ?? toNumber(payload?.league_year) ?? null,
+    season:
+      parseSeasonYear(payload?.league?.season) ??
+      parseSeasonYear(payload?.league_year) ??
+      null,
     homeTeamId:
       payload?.teams?.home?.id ?? toNumber(payload?.match_hometeam_id) ?? null,
     awayTeamId:

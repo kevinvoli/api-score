@@ -1,3 +1,4 @@
+import { ConfidenceValue } from '../confidence-value/ConfidenceValue';
 import styles from './CouponSelectionRow.module.css';
 
 export type CouponSelectionRowProps = {
@@ -5,7 +6,8 @@ export type CouponSelectionRowProps = {
   marketType: string;
   fixtureLabel?: string;
   odd: number;
-  confidence: number;
+  confidenceScore: number | null;
+  baseRateSampleSize: number | null;
   edgePct: number;
   riskFlags: string[];
   correlation: 'low' | 'medium' | 'high';
@@ -23,7 +25,8 @@ export function CouponSelectionRow({
   marketType,
   fixtureLabel,
   odd,
-  confidence,
+  confidenceScore,
+  baseRateSampleSize,
   edgePct,
   riskFlags,
   correlation,
@@ -44,7 +47,11 @@ export function CouponSelectionRow({
         </div>
       </div>
       <div className={styles.stats}>
-        <p className={styles.confidence}>{confidence}</p>
+        <ConfidenceValue
+          confidenceScore={confidenceScore}
+          baseRateSampleSize={baseRateSampleSize}
+          valueClassName={styles.confidence}
+        />
         <span>Confiance</span>
       </div>
       <div className={styles.actions}>

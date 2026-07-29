@@ -1,0 +1,27 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wrapper.inline {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.value {
+  font-weight: 700;
+}
+
+.unavailable {
+  color: var(--color-text-secondary);
+}
+
+.sample {
+  font-size: 0.8em;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  opacity: 0.85;
+  white-space: nowrap;
+}

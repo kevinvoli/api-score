@@ -2,6 +2,7 @@ import { ApiFootballPayload } from './api-football-payload.entity';
 import { ApiUsageLog } from './api-usage-log.entity';
 import { AppRuntimeState } from './app-runtime-state.entity';
 import { BacktestRun } from './backtest-run.entity';
+import { BaseRate } from './base-rate.entity';
 import { BetRecommendation } from './bet-recommendation.entity';
 import { BetResult } from './bet-result.entity';
 import { Country } from './country.entity';
@@ -24,6 +25,7 @@ export const ALL_ENTITIES = [
   ApiUsageLog,
   AppRuntimeState,
   BacktestRun,
+  BaseRate,
   BetRecommendation,
   BetResult,
   Country,

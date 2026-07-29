@@ -4,6 +4,7 @@ import { BetRecommendation } from '../database/entities/bet-recommendation.entit
 import { Fixture } from '../database/entities/fixture.entity';
 import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapshot.entity';
 import { SmartCoupon } from '../database/entities/smart-coupon.entity';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { ProviderApiFootballModule } from '../provider-api-football/provider-api-football.module';
 import { SettingsModule } from '../settings/settings.module';
 import { RecommendationsController } from './recommendations.controller';
@@ -20,6 +21,7 @@ import { SmartSuggestionsService } from './smart-suggestions.service';
     ]),
     ProviderApiFootballModule,
     SettingsModule,
+    AnalyticsModule,
   ],
   controllers: [RecommendationsController],
   providers: [RecommendationsService, SmartSuggestionsService],

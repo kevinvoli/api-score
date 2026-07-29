@@ -131,6 +131,24 @@
 }
 
 /* Barre de confiance */
+.confBarRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.confSample {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  opacity: 0.85;
+}
+
+.confUnavailable {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 .confBar {
   display: flex;
   align-items: center;

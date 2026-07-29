@@ -55,7 +55,8 @@ export default function RecommendationsPage() {
                     selection: recommendation.selection,
                     fixtureLabel,
                     odd: recommendation.currentOdd,
-                    confidence: recommendation.confidenceScore,
+                    confidenceScore: recommendation.confidenceScore,
+                    baseRateSampleSize: recommendation.baseRateSampleSize,
                     edge: recommendation.edgePct,
                     riskFlags: recommendation.riskFlags
                   })

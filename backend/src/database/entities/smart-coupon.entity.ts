@@ -60,6 +60,10 @@ export class SmartCoupon {
   @Column({ type: 'int', nullable: true })
   confidenceScore: number | null;
 
+  // Taille de l'échantillon du taux de base ayant produit `confidenceScore` (LOT 2).
+  @Column({ type: 'int', nullable: true })
+  baseRateSampleSize: number | null;
+
   @Column({ type: 'json', nullable: true })
   reasons: string[] | null;
 

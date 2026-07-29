@@ -1,3 +1,4 @@
+import { ConfidenceValue } from '../confidence-value/ConfidenceValue';
 import styles from './RecommendationCard.module.css';
 
 export type RecommendationCardProps = {
@@ -9,7 +10,8 @@ export type RecommendationCardProps = {
     currentOdd: number;
     minAcceptableOdd: number;
     edgePct: number;
-    confidenceScore: number;
+    confidenceScore: number | null;
+    baseRateSampleSize: number | null;
     reasons: string[];
     riskFlags: string[];
     status: 'NEW' | 'ACTIVE' | 'REJECTED';
@@ -73,7 +75,10 @@ export function RecommendationCard({
         </div>
         <div>
           <p>Confiance</p>
-          <strong>{recommendation.confidenceScore}</strong>
+          <ConfidenceValue
+            confidenceScore={recommendation.confidenceScore}
+            baseRateSampleSize={recommendation.baseRateSampleSize}
+          />
         </div>
         <div>
           <p>Cote</p>

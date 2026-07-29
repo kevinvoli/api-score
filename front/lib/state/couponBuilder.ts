@@ -5,7 +5,8 @@ export type CouponSelection = {
   selection: string;
   fixtureLabel?: string;
   odd: number;
-  confidence: number;
+  confidenceScore: number | null;
+  baseRateSampleSize: number | null;
   edge: number;
   riskFlags: string[];
 };

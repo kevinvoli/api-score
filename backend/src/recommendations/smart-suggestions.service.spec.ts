@@ -10,6 +10,7 @@ import {
   DEFAULT_CONFIG,
 } from '../settings/smart-rules-config.service';
 import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
+import { BaseRatesService } from '../analytics/base-rates.service';
 import { JsonLogger } from '../common/json.logger';
 
 // ── Factories ────────────────────────────────────────────────
@@ -117,6 +118,7 @@ describe('SmartSuggestionsService', () => {
   let couponRepo: ReturnType<typeof mockRepository>;
   let configService: { getConfig: jest.Mock };
   let apiClient: { fetchAllLiveOdds: jest.Mock; fetchLiveFixtures?: jest.Mock };
+  let baseRatesService: { buildLookup: jest.Mock };
   let logger: { log: jest.Mock; warn: jest.Mock; error: jest.Mock };
 
   beforeEach(async () => {
@@ -127,6 +129,9 @@ describe('SmartSuggestionsService', () => {
 
     configService = { getConfig: jest.fn().mockResolvedValue(DEFAULT_CONFIG) };
     apiClient = { fetchAllLiveOdds: jest.fn().mockResolvedValue(new Map()) };
+    baseRatesService = {
+      buildLookup: jest.fn().mockResolvedValue(new Map()),
+    };
     logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -141,6 +146,7 @@ describe('SmartSuggestionsService', () => {
         { provide: getRepositoryToken(SmartCoupon), useValue: couponRepo },
         { provide: SmartRulesConfigService, useValue: configService },
         { provide: ApiFootballClient, useValue: apiClient },
+        { provide: BaseRatesService, useValue: baseRatesService },
         { provide: JsonLogger, useValue: logger },
       ],
     }).compile();
@@ -216,6 +222,48 @@ describe('SmartSuggestionsService', () => {
       expect(recoRepo.save).toHaveBeenCalled();
       const savedEntities: unknown[] = recoRepo.save.mock.calls[0][0];
       expect(savedEntities.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("branche confidenceScore sur le taux de base réel (%) et sa taille d'échantillon", async () => {
+      const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
+      const snap = makeStatsSnapshot(fixture.id, 10, 12);
+      setupEvaluateFixturesMocks([[fixture], []], [[snap]]);
+
+      // Taux réel seulement pour goal_1h au seuil 10 (leagueId 39, saison 2024).
+      // goal_ft (Buts match) au même seuil n'a pas de taux → confidence null.
+      baseRatesService.buildLookup.mockResolvedValue(
+        new Map([
+          ['39|2024|goal_1h|10', { observedRate: 0.68, sampleSize: 340 }],
+        ]),
+      );
+
+      couponRepo.findOne.mockResolvedValue(null);
+      couponRepo.find.mockResolvedValue([]);
+      recoRepo.delete.mockResolvedValue({});
+      recoRepo.save.mockResolvedValue([]);
+      couponRepo.save.mockResolvedValue({});
+
+      await service.evaluateAndSave();
+
+      const saved: Array<{
+        marketType: string;
+        confidenceScore: number | null;
+        baseRateSampleSize: number | null;
+      }> = recoRepo.save.mock.calls[0][0];
+
+      const firstHalf = saved.find(
+        (s) => s.marketType === 'Buts 1ère mi-temps',
+      );
+      expect(firstHalf).toMatchObject({
+        confidenceScore: 68,
+        baseRateSampleSize: 340,
+      });
+
+      const fullMatch = saved.find((s) => s.marketType === 'Buts match');
+      expect(fullMatch).toMatchObject({
+        confidenceScore: null,
+        baseRateSampleSize: null,
+      });
     });
 
     it('ne crée aucune suggestion quand shots insuffisants (shots=5, seuil=10 à elapsed=25)', async () => {
