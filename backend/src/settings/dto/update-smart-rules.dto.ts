@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -10,6 +11,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { SIGNAL_TYPES } from '../smart-rules-config.service';
 
 /** Fenêtre de déclenchement : « avant maxElapsed minutes, au moins minShots tirs ». */
 export class HalfRuleDto {
@@ -61,7 +63,34 @@ export class OddsSettingsDto {
   secondHalf: OddsConfigDto;
 }
 
+/** Décalages de seuil selon l'état au score (LOT 3.4). */
+export class ScoreStateModifiersDto {
+  @IsInt()
+  @Min(-20)
+  @Max(20)
+  leading: number;
+
+  @IsInt()
+  @Min(-20)
+  @Max(20)
+  trailing: number;
+
+  @IsInt()
+  @Min(-20)
+  @Max(20)
+  drawing: number;
+}
+
 export class UpdateSmartRulesDto {
+  @IsOptional()
+  @IsIn(SIGNAL_TYPES)
+  signal?: (typeof SIGNAL_TYPES)[number];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ScoreStateModifiersDto)
+  scoreStateModifiers?: ScoreStateModifiersDto;
+
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(20)

@@ -7,10 +7,16 @@ import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapsho
 import { BetRecommendation } from '../database/entities/bet-recommendation.entity';
 import { SmartCoupon } from '../database/entities/smart-coupon.entity';
 import { JsonLogger } from '../common/json.logger';
-import { extractTotalShots, extractHtScore } from '../common/utils/stats.utils';
+import {
+  extractTotalShots,
+  extractHtScore,
+  getStatValue,
+  computePressureIndex,
+} from '../common/utils/stats.utils';
 import {
   SmartRulesConfigService,
   SmartRulesConfig,
+  SignalType,
 } from '../settings/smart-rules-config.service';
 import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
 import {
@@ -27,8 +33,24 @@ import {
 import {
   BaseRatesService,
   MARKET_TYPE_TO_BASE_RATE,
+  SIGNAL_TO_BASE_RATE,
   baseRateKey,
 } from '../analytics/base-rates.service';
+
+/** Les trois signaux offensifs extraits d'un snapshot (LOT 3). */
+interface SnapshotSignals {
+  totalShots: number | null;
+  shotsOnTarget: number;
+  pressureIndex: number;
+}
+
+function snapshotSignals(stats: Record<string, unknown>): SnapshotSignals {
+  return {
+    totalShots: extractTotalShots(stats),
+    shotsOnTarget: getStatValue(stats, ['On Target', 'Shots on Goal']),
+    pressureIndex: computePressureIndex(stats),
+  };
+}
 
 export type SmartSuggestion = {
   id: string;
@@ -338,7 +360,7 @@ export class SmartSuggestionsService {
    */
   private async buildHtBaseline(
     fixtures: Fixture[],
-  ): Promise<Map<string, number>> {
+  ): Promise<Map<string, SnapshotSignals>> {
     const fixtureIds = fixtures.map((f) => f.id);
     const htSnapshots = await this.statsRepo
       .createQueryBuilder('s')
@@ -347,13 +369,12 @@ export class SmartSuggestionsService {
       .orderBy('s.snapshotAt', 'DESC')
       .getMany();
 
-    const htBaseline = new Map<string, number>();
+    const htBaseline = new Map<string, SnapshotSignals>();
     for (const snap of htSnapshots) {
       if (!snap.teamId) continue;
       const key = `${snap.fixtureId}:${snap.teamId}`;
       if (!htBaseline.has(key)) {
-        const shots = extractTotalShots(snap.stats);
-        if (shots !== null) htBaseline.set(key, shots);
+        htBaseline.set(key, snapshotSignals(snap.stats));
       }
     }
     return htBaseline;
@@ -371,10 +392,11 @@ export class SmartSuggestionsService {
     config: SmartRulesConfig,
     liveOdds: LiveOddsMap,
     halfSuffix: string,
-    htBaseline?: Map<string, number>,
+    htBaseline?: Map<string, SnapshotSignals>,
   ): Promise<SmartSuggestion[]> {
     if (!fixtures.length) return [];
 
+    const signal: SignalType = config.signal ?? 'TOTAL_SHOTS';
     const fixtureIds = fixtures.map((f) => f.id);
     const allSnapshots = await this.statsRepo
       .createQueryBuilder('s')
@@ -382,13 +404,14 @@ export class SmartSuggestionsService {
       .orderBy('s.snapshotAt', 'DESC')
       .getMany();
 
-    // Taux de base préchargés (LOT 2) : une requête pour tout le lot de fixtures.
+    // Taux de base préchargés (LOT 2) : une requête pour tout le lot de fixtures,
+    // pour le signal effectivement en usage (LOT 3).
     const baseRatePairs = fixtures
       .filter((f) => f.leagueId !== null && f.season !== null)
       .map((f) => ({ leagueId: f.leagueId!, season: f.season! }));
     const baseRateLookup = await this.baseRatesService.buildLookup(
       baseRatePairs,
-      'total_shots',
+      SIGNAL_TO_BASE_RATE[signal],
     );
 
     // Snapshot le plus récent par (fixtureId, teamId)
@@ -420,25 +443,45 @@ export class SmartSuggestionsService {
           ? (liveOdds.get(provId)?.ou05Over ?? null)
           : null;
 
+      const homeSignals = homeSnap
+        ? snapshotSignals(homeSnap.stats)
+        : { totalShots: null, shotsOnTarget: null, pressureIndex: null };
+      const awaySignals = awaySnap
+        ? snapshotSignals(awaySnap.stats)
+        : { totalShots: null, shotsOnTarget: null, pressureIndex: null };
+      const htHome = htBaseline?.get(`${fixture.id}:${fixture.homeTeamId}`);
+      const htAway = htBaseline?.get(`${fixture.id}:${fixture.awayTeamId}`);
+
       const input: RuleEvaluationInput = {
         elapsed,
         statusShort: fixture.statusShort ?? '',
         home: {
           teamId: fixture.homeTeamId,
           teamName: fixture.homeTeamName ?? 'Équipe',
-          totalShots: homeSnap ? extractTotalShots(homeSnap.stats) : null,
+          ...homeSignals,
         },
         away: {
           teamId: fixture.awayTeamId,
           teamName: fixture.awayTeamName ?? 'Équipe',
-          totalShots: awaySnap ? extractTotalShots(awaySnap.stats) : null,
+          ...awaySignals,
         },
         htShots: htBaseline
+          ? { home: htHome?.totalShots ?? 0, away: htAway?.totalShots ?? 0 }
+          : undefined,
+        htOnTarget: htBaseline
           ? {
-              home: htBaseline.get(`${fixture.id}:${fixture.homeTeamId}`) ?? 0,
-              away: htBaseline.get(`${fixture.id}:${fixture.awayTeamId}`) ?? 0,
+              home: htHome?.shotsOnTarget ?? 0,
+              away: htAway?.shotsOnTarget ?? 0,
             }
           : undefined,
+        htPressure: htBaseline
+          ? {
+              home: htHome?.pressureIndex ?? 0,
+              away: htAway?.pressureIndex ?? 0,
+            }
+          : undefined,
+        scoreHome: fixture.scoreHome,
+        scoreAway: fixture.scoreAway,
         liveOdd,
       };
 

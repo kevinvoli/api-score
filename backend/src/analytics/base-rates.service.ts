@@ -240,6 +240,16 @@ export const MARKET_TYPE_TO_BASE_RATE: Record<string, BaseRateMarket> = {
   'Buts 2ème mi-temps': 'goal_2h',
 };
 
+/** Signal de config (LOT 3) → signal des taux de base. */
+export const SIGNAL_TO_BASE_RATE: Record<
+  'TOTAL_SHOTS' | 'ON_TARGET' | 'PRESSURE_INDEX',
+  BaseRateSignal
+> = {
+  TOTAL_SHOTS: 'total_shots',
+  ON_TARGET: 'on_target',
+  PRESSURE_INDEX: 'pressure_index',
+};
+
 function groupBy<T>(items: T[], keyOf: (item: T) => string): Map<string, T[]> {
   const map = new Map<string, T[]>();
   for (const item of items) {

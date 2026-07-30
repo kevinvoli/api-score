@@ -2,11 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { JsonLogger } from '../common/json.logger';
-import { extractHtScore, extractTotalShots } from '../common/utils/stats.utils';
+import {
+  extractHtScore,
+  extractTotalShots,
+  getStatValue,
+  computePressureIndex,
+} from '../common/utils/stats.utils';
 import { ApiFootballPayload } from '../database/entities/api-football-payload.entity';
 import { BacktestRun } from '../database/entities/backtest-run.entity';
 import { BetResult } from '../database/entities/bet-result.entity';
 import { Fixture } from '../database/entities/fixture.entity';
+import { FixtureEvent } from '../database/entities/fixture-event.entity';
 import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapshot.entity';
 import {
   resolveOutcome,
@@ -36,6 +42,8 @@ export class BacktestEngineService {
     private readonly fixtureRepo: Repository<Fixture>,
     @InjectRepository(FixtureStatsSnapshot)
     private readonly statsRepo: Repository<FixtureStatsSnapshot>,
+    @InjectRepository(FixtureEvent)
+    private readonly eventRepo: Repository<FixtureEvent>,
     @InjectRepository(ApiFootballPayload)
     private readonly payloadRepo: Repository<ApiFootballPayload>,
     private readonly logger: JsonLogger,
@@ -166,6 +174,18 @@ export class BacktestEngineService {
       snapshotsByFixture.set(snap.fixtureId, list);
     }
 
+    // Buts (minute) pour reconstruire le score courant à chaque tick (LOT 3.4).
+    const goals = await this.eventRepo.find({
+      where: { fixtureId: In(fixtureIds), eventType: 'Goal' },
+      select: ['fixtureId', 'teamId', 'minute'],
+    });
+    const goalsByFixture = new Map<string, FixtureEvent[]>();
+    for (const goal of goals) {
+      const list = goalsByFixture.get(goal.fixtureId) ?? [];
+      list.push(goal);
+      goalsByFixture.set(goal.fixtureId, list);
+    }
+
     const bets: DecidedBet[] = [];
 
     for (const [fixtureId, fixtureSnaps] of snapshotsByFixture) {
@@ -177,16 +197,34 @@ export class BacktestEngineService {
       const matchOdds =
         oddsByMatch.get(String(fixture.providerFixtureId)) ?? [];
       const placedKeys = new Set<string>();
+      const fixtureGoals = goalsByFixture.get(fixtureId) ?? [];
 
-      // État courant reconstruit au fil des ticks
+      /** Score de chaque équipe aux buts inscrits jusqu'à `elapsed` inclus. */
+      const scoreAt = (elapsed: number): { home: number; away: number } => {
+        let home = 0;
+        let away = 0;
+        for (const g of fixtureGoals) {
+          if (g.minute === null || g.minute > elapsed) continue;
+          if (g.teamId === fixture.homeTeamId) home += 1;
+          else if (g.teamId === fixture.awayTeamId) away += 1;
+        }
+        return { home, away };
+      };
+
+      // État courant reconstruit au fil des ticks (un accumulateur par signal, LOT 3)
       const shotsByTeam = new Map<number, number>();
+      const onTargetByTeam = new Map<number, number>();
+      const pressureByTeam = new Map<number, number>();
       const htShotsByTeam = new Map<number, number>();
+      const htOnTargetByTeam = new Map<number, number>();
+      const htPressureByTeam = new Map<number, number>();
 
       let tickAt: Date | null = null;
       let tickElapsed: number | null = null;
 
       const evaluateTick = () => {
         if (tickAt === null || tickElapsed === null) return;
+        const score = scoreAt(tickElapsed);
         const input: RuleEvaluationInput = {
           elapsed: tickElapsed,
           // Convention apifootball du live : tout match en cours est 'LIVE' ;
@@ -196,16 +234,30 @@ export class BacktestEngineService {
             teamId: fixture.homeTeamId!,
             teamName: fixture.homeTeamName ?? 'Équipe',
             totalShots: shotsByTeam.get(fixture.homeTeamId!) ?? null,
+            shotsOnTarget: onTargetByTeam.get(fixture.homeTeamId!) ?? null,
+            pressureIndex: pressureByTeam.get(fixture.homeTeamId!) ?? null,
           },
           away: {
             teamId: fixture.awayTeamId!,
             teamName: fixture.awayTeamName ?? 'Équipe',
             totalShots: shotsByTeam.get(fixture.awayTeamId!) ?? null,
+            shotsOnTarget: onTargetByTeam.get(fixture.awayTeamId!) ?? null,
+            pressureIndex: pressureByTeam.get(fixture.awayTeamId!) ?? null,
           },
           htShots: {
             home: htShotsByTeam.get(fixture.homeTeamId!) ?? 0,
             away: htShotsByTeam.get(fixture.awayTeamId!) ?? 0,
           },
+          htOnTarget: {
+            home: htOnTargetByTeam.get(fixture.homeTeamId!) ?? 0,
+            away: htOnTargetByTeam.get(fixture.awayTeamId!) ?? 0,
+          },
+          htPressure: {
+            home: htPressureByTeam.get(fixture.homeTeamId!) ?? 0,
+            away: htPressureByTeam.get(fixture.awayTeamId!) ?? 0,
+          },
+          scoreHome: score.home,
+          scoreAway: score.away,
           liveOdd: null,
         };
 
@@ -258,12 +310,22 @@ export class BacktestEngineService {
         tickAt = snap.snapshotAt;
         if (snap.elapsed !== null) tickElapsed = snap.elapsed;
         if (snap.teamId) {
+          const isHt = (snap.elapsed ?? 99) <= 45;
           const shots = extractTotalShots(snap.stats);
           if (shots !== null) {
             shotsByTeam.set(snap.teamId, shots);
-            if ((snap.elapsed ?? 99) <= 45)
-              htShotsByTeam.set(snap.teamId, shots);
+            if (isHt) htShotsByTeam.set(snap.teamId, shots);
           }
+          const onTarget = getStatValue(snap.stats, [
+            'On Target',
+            'Shots on Goal',
+          ]);
+          onTargetByTeam.set(snap.teamId, onTarget);
+          if (isHt) htOnTargetByTeam.set(snap.teamId, onTarget);
+
+          const pressure = computePressureIndex(snap.stats);
+          pressureByTeam.set(snap.teamId, pressure);
+          if (isHt) htPressureByTeam.set(snap.teamId, pressure);
         }
       }
       evaluateTick();

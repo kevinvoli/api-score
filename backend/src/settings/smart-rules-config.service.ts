@@ -5,7 +5,31 @@ import { AppRuntimeState } from '../database/entities/app-runtime-state.entity';
 
 export type HalfRule = { maxElapsed: number; minShots: number };
 
+/** Signal offensif servant de critère de déclenchement (LOT 3). */
+export const SIGNAL_TYPES = [
+  'TOTAL_SHOTS',
+  'ON_TARGET',
+  'PRESSURE_INDEX',
+] as const;
+export type SignalType = (typeof SIGNAL_TYPES)[number];
+
+/**
+ * Ajustement du seuil de déclenchement selon l'état au score de l'équipe
+ * (LOT 3.4). Ajouté au `minShots` : positif = plus exigeant, négatif = plus
+ * permissif. Une équipe menée pousse davantage → on peut abaisser le seuil ;
+ * une équipe qui mène lève le pied → on le relève.
+ */
+export type ScoreStateModifiers = {
+  leading: number;
+  trailing: number;
+  drawing: number;
+};
+
 export type SmartRulesConfig = {
+  /** Critère de déclenchement des règles (défaut TOTAL_SHOTS). */
+  signal?: SignalType;
+  /** Modulation du seuil selon l'état au score (défaut neutre : 0 partout). */
+  scoreStateModifiers?: ScoreStateModifiers;
   /** Règles progressives sur la 1ère mi-temps */
   firstHalfRules: HalfRule[];
   /** Règle unique pour la 2ème mi-temps */
@@ -36,6 +60,8 @@ export type SmartRulesConfig = {
 const STATE_KEY = 'smart-rules-config';
 
 export const DEFAULT_CONFIG: SmartRulesConfig = {
+  signal: 'TOTAL_SHOTS',
+  scoreStateModifiers: { leading: 0, trailing: 0, drawing: 0 },
   firstHalfRules: [
     { maxElapsed: 10, minShots: 5 },
     { maxElapsed: 20, minShots: 7 },

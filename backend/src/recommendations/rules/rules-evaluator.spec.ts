@@ -157,3 +157,104 @@ describe('evaluateRules()', () => {
     );
   });
 });
+
+describe('evaluateRules() — signal configurable (LOT 3.2)', () => {
+  it('ON_TARGET : déclenche sur les tirs cadrés, ignore le total de tirs', () => {
+    const config = { ...DEFAULT_CONFIG, signal: 'ON_TARGET' as const };
+    const input = makeInput({
+      elapsed: 25, // règle { maxElapsed: 30, minShots: 10 }
+      home: {
+        teamId: 10,
+        teamName: 'PSG',
+        totalShots: 2, // sous le seuil en TOTAL_SHOTS
+        shotsOnTarget: 12, // au-dessus en ON_TARGET
+      },
+    });
+
+    const matches = evaluateRules(input, config);
+    expect(matches.map((m) => m.marketType)).toEqual([
+      'Buts 1ère mi-temps',
+      'Buts match',
+    ]);
+    expect(matches[0].signal).toBe('ON_TARGET');
+    expect(matches[0].shotsCount).toBe(12);
+  });
+
+  it('ON_TARGET : pas de déclenchement si les tirs cadrés sont sous le seuil, même avec beaucoup de tirs', () => {
+    const config = { ...DEFAULT_CONFIG, signal: 'ON_TARGET' as const };
+    const input = makeInput({
+      elapsed: 25,
+      home: { teamId: 10, teamName: 'PSG', totalShots: 20, shotsOnTarget: 3 },
+    });
+    expect(evaluateRules(input, config)).toHaveLength(0);
+  });
+
+  it("PRESSURE_INDEX : déclenche sur l'indice de pression", () => {
+    const config = { ...DEFAULT_CONFIG, signal: 'PRESSURE_INDEX' as const };
+    const input = makeInput({
+      elapsed: 25,
+      home: {
+        teamId: 10,
+        teamName: 'PSG',
+        totalShots: null,
+        pressureIndex: 11,
+      },
+    });
+    const matches = evaluateRules(input, config);
+    expect(matches).toHaveLength(2);
+    expect(matches[0].signal).toBe('PRESSURE_INDEX');
+  });
+});
+
+describe('evaluateRules() — modulation par état au score (LOT 3.4)', () => {
+  it("relève le seuil quand l'équipe mène", () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      scoreStateModifiers: { leading: 5, trailing: 0, drawing: 0 },
+    };
+    // 12 tirs, seuil de base 10 : déclencherait à l'état nul, mais l'équipe mène
+    // (+5 → seuil effectif 15) donc 12 < 15 → rien.
+    const input = makeInput({
+      elapsed: 25,
+      home: { teamId: 10, teamName: 'PSG', totalShots: 12 },
+      scoreHome: 1,
+      scoreAway: 0,
+    });
+    expect(evaluateRules(input, config)).toHaveLength(0);
+
+    // Même input sans modulation → déclenche.
+    expect(evaluateRules(input, DEFAULT_CONFIG).length).toBeGreaterThan(0);
+  });
+
+  it("abaisse le seuil quand l'équipe est menée et expose le seuil effectif", () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      scoreStateModifiers: { leading: 0, trailing: -5, drawing: 0 },
+    };
+    // 6 tirs, seuil de base 10 : ne déclencherait pas, mais l'équipe est menée
+    // (-5 → seuil effectif 5) donc 6 >= 5 → déclenche.
+    const input = makeInput({
+      elapsed: 25,
+      home: { teamId: 10, teamName: 'PSG', totalShots: 6 },
+      scoreHome: 0,
+      scoreAway: 1,
+    });
+    const matches = evaluateRules(input, config);
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches[0].signalThreshold).toBe(5);
+    expect(matches[0].reasons[0]).toContain('seuil : ≥5');
+  });
+
+  it('score inconnu → état neutre (drawing), aucun décalage appliqué', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      scoreStateModifiers: { leading: 5, trailing: 5, drawing: 0 },
+    };
+    const input = makeInput({
+      elapsed: 25,
+      home: { teamId: 10, teamName: 'PSG', totalShots: 12 },
+      // scoreHome / scoreAway non fournis
+    });
+    expect(evaluateRules(input, config).length).toBeGreaterThan(0);
+  });
+});

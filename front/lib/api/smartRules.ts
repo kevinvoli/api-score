@@ -4,6 +4,10 @@ export type HalfRule = { maxElapsed: number; minShots: number };
 
 export type OddsConfig = { current: number; min: number; edgePct: number; confidence: number };
 
+export type ShotSignal = 'TOTAL_SHOTS' | 'ON_TARGET' | 'PRESSURE_INDEX';
+
+export type ScoreStateModifiers = { leading: number; trailing: number; drawing: number };
+
 export type SmartRulesConfig = {
   firstHalfRules: HalfRule[];
   secondHalfRule: HalfRule;
@@ -12,6 +16,8 @@ export type SmartRulesConfig = {
     firstHalfFT: OddsConfig;
     secondHalf:  OddsConfig;
   };
+  signal?: ShotSignal;
+  scoreStateModifiers?: ScoreStateModifiers;
 };
 
 export const DEFAULT_CONFIG: SmartRulesConfig = {
@@ -28,6 +34,8 @@ export const DEFAULT_CONFIG: SmartRulesConfig = {
     firstHalfFT: { current: 1.45, min: 1.35, edgePct:  8.0, confidence: 75 },
     secondHalf:  { current: 1.65, min: 1.50, edgePct: 10.0, confidence: 72 },
   },
+  signal: 'TOTAL_SHOTS',
+  scoreStateModifiers: { leading: 0, trailing: 0, drawing: 0 },
 };
 
 export const fetchSmartRules = (): Promise<SmartRulesConfig> =>

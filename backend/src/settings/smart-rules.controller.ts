@@ -33,6 +33,9 @@ export class SmartRulesController {
     }
 
     return this.configService.updateConfig({
+      signal: dto.signal ?? DEFAULT_CONFIG.signal,
+      scoreStateModifiers:
+        dto.scoreStateModifiers ?? DEFAULT_CONFIG.scoreStateModifiers,
       firstHalfRules: dto.firstHalfRules,
       secondHalfRule: dto.secondHalfRule,
       odds: dto.odds ?? DEFAULT_CONFIG.odds,
