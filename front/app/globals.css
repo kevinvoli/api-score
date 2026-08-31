@@ -1635,6 +1635,27 @@ body {
 .param-save-btn:hover:not(:disabled) { opacity: 0.88; }
 .param-save-btn:disabled { opacity: 0.45; cursor: default; }
 
+/* ── Backtest de test (LOT A.5) ────────────────────────────── */
+.param-backtest-actions { display: flex; margin-top: 4px; }
+.param-backtest-result {
+  margin-top: 16px; padding: 16px; border-radius: 12px;
+  border: 1px solid var(--color-border); background: rgba(255,255,255,0.03);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.param-backtest-headline { display: flex; gap: 28px; flex-wrap: wrap; }
+.param-backtest-metric-label { margin: 0; font-size: 0.75rem; color: var(--color-text-secondary); }
+.param-backtest-metric-value { font-size: 1.4rem; font-weight: 700; color: var(--color-text-primary); }
+.param-backtest-note { margin: 0; font-size: 0.78rem; color: var(--color-text-secondary); line-height: 1.5; }
+.param-backtest-note--warn { color: #fbbf24; }
+.param-backtest-markets { display: flex; flex-direction: column; gap: 6px; }
+.param-backtest-market-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.03);
+  font-size: 0.82rem;
+}
+.param-backtest-market-name { color: var(--color-text-secondary); }
+.param-backtest-market-stat { font-weight: 600; color: var(--color-text-primary); }
+
 /* ── Coupon Historique ──────────────────────────────────────── */
 .coupon-hist-section { margin-top: 36px; }
 .coupon-hist-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }

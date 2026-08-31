@@ -1,4 +1,5 @@
 import { apiFetch } from './client';
+import type { SmartRulesConfig } from './smartRules';
 
 export type BacktestKpis = {
   betCount: number;
@@ -62,4 +63,18 @@ export const runBaselineBacktest = () =>
   apiFetch<BacktestRun>('/v1/audit/backtest', {
     method: 'POST',
     body: JSON.stringify({}),
+  });
+
+/**
+ * LOT A.5 — bouton « Tester cette configuration en backtest » de Paramètres.
+ * Envoie la config en cours d'édition (pas encore sauvegardée) au backend,
+ * qui la rejoue sur l'historique sans jamais toucher à la config persistée.
+ */
+export const testBacktestConfig = (entryRules: SmartRulesConfig) =>
+  apiFetch<BacktestRun>('/v1/audit/backtest', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: `Test config (Paramètres) — ${new Date().toLocaleString('fr-FR')}`,
+      entryRules,
+    }),
   });

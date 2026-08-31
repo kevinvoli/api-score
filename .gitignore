@@ -10,3 +10,8 @@ front/.storybook/cache
 
 # Secrets locaux
 front/.env.local
+
+# Caches d'outils (pnpm store, incrémental TypeScript) — accidentellement
+# suivis par le passé, jamais utiles en dépôt.
+.pnpm-store/
+*.tsbuildinfo

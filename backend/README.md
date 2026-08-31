@@ -1,154 +1,80 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# API SCORE — Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API NestJS (TypeScript) qui alimente le scanner d'opportunités de paris football
+API SCORE : ingestion live des matchs (API-Football), calcul de signaux
+(pression offensive, tirs cadrés), taux de base réels par championnat,
+recommandations et coupons intelligents, backtest sur historique.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Voir `AVIS_PRONOSTIQUEUR.md` (racine du dépôt) pour le positionnement produit :
+un détecteur d'opportunités mesuré par hit-rate et rappel, pas une plateforme
+de value betting.
 
-## Description
+## Stack
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- NestJS 10 / TypeScript
+- TypeORM 0.3 + **MySQL 8** (pas PostgreSQL)
+- `@nestjs/schedule` pour les jobs (sync live, résolution des coupons, purge)
+- Jest pour les tests unitaires
 
-## Project setup
+## Démarrage
 
 ```bash
-$ npm install
+npm install
+copy .env.example .env    # ou cp sur Linux/macOS — puis renseigner API_FOOTBALL_KEY, DB_URL, API_KEY
+npm run db:migrate        # applique les migrations sur la base MySQL pointée par DB_URL
+npm run start:dev         # démarre en watch mode sur le PORT défini (3010 par défaut)
 ```
 
-## Compile and run the project
+Toutes les routes sont préfixées par `/v1` et protégées par une clé API
+(header `x-api-key`, voir `API_KEY` dans `.env`), à l'exception des routes
+explicitement marquées publiques (`@Public()`).
 
-```bash
-# development
-$ npm run start
+## Scripts utiles
 
-# watch mode
-$ npm run start:dev
+| Commande | Effet |
+|---|---|
+| `npm run start:dev` | Démarre l'API en mode watch |
+| `npm run build` | Build de production (`dist/`) |
+| `npm run lint:check` | Lint strict (utilisé en CI, `--max-warnings=0`) |
+| `npm test` | Suite de tests unitaires (Jest) |
+| `npm run test:cov` | Tests avec couverture |
+| `npm run db:migrate` | Applique les migrations TypeORM en attente |
+| `npm run db:migrate:revert` | Annule la dernière migration |
+| `npm run import:history` | Importe l'historique d'un championnat/saison (LOT 1) |
 
-# production mode
-$ npm run start:prod
-```
+## Modules principaux (`src/`)
 
-## Run tests
+| Module | Rôle |
+|---|---|
+| `fixtures` | Ingestion live des matchs, scheduler, lecture (`/v1/live/fixtures`) |
+| `provider-api-football` | Client HTTP centralisé vers API-Football (retry, circuit breaker, logs de quota) |
+| `recommendations` | Règles de déclenchement (`rules-evaluator.ts`), suggestions et smart coupons |
+| `settings` | Configuration des règles métier, persistée en base (`/v1/settings/smart-rules`) |
+| `analytics` | Métriques par fixture et **taux de base réels** par championnat (`base-rates.*`) |
+| `odds` | Ingestion et historisation des cotes (désactivée par défaut, `ODDS_SYNC_ENABLED=false`) |
+| `history` | Import de l'historique par championnat (LOT 1) |
+| `backtest` / `audit` | Moteur de rejeu sur l'historique et endpoints `/v1/audit/backtest` |
+| `monitoring` | Health check et métriques (`/v1/health`, `/v1/metrics/*`) |
+| `maintenance` | Purge planifiée (rétention configurable, voir `DATA_RETENTION_DAYS`) |
 
-```bash
-# unit tests
-$ npm run test
+## Variables d'environnement clés
 
-# e2e tests
-$ npm run test:e2e
+Voir `.env.example` pour la liste complète et validée (`src/config/env.validation.ts`).
+À retenir particulièrement :
 
-# test coverage
-$ npm run test:cov
-```
+- `DB_URL` : chaîne de connexion **MySQL** (`mysql://user:pass@host:3306/db`).
+- `DATA_RETENTION_DAYS` (défaut 1095, ~3 saisons) : rétention des matchs et de
+  leurs statistiques — matière première des taux de base et du backtest.
+  `PAYLOAD_RETENTION_DAYS` (défaut 90) ne concerne que les payloads bruts,
+  volumineux et réimportables.
+- `ODDS_SYNC_ENABLED` : désactivé par défaut. Le module Odds est fonctionnel
+  mais secondaire pour un scanner (voir `AVIS_PRONOSTIQUEUR.md`).
+- `API_KEY` : clé exigée sur les routes protégées (header `x-api-key`).
 
-## Lot 1 quick start
+## Documentation complémentaire
 
-```bash
-# 1) install deps
-$ npm install
-
-# 2) create local env
-$ copy .env.example .env
-
-# 3) run DB migrations (requires PostgreSQL reachable via DB_URL)
-$ npm run db:migrate
-
-# 4) run app
-$ npm run start:dev
-```
-
-Core Lot 1 endpoints:
-
-- `GET /v1/health`
-- `GET /v1/metrics/usage`
-
-Lot 2 ingestion endpoints:
-
-- `POST /v1/live/fixtures/sync`
-- `GET /v1/live/fixtures`
-- `GET /v1/live/fixtures/:fixtureId/events`
-- `GET /v1/live/fixtures/:fixtureId/lineups`
-- `GET /v1/live/fixtures/:fixtureId/players`
-- `GET /v1/live/fixtures/:fixtureId/stats/latest`
-- `GET /v1/live/fixtures/:fixtureId/summary`
-- `GET /v1/live/fixtures/:fixtureId/detail`
-
-`GET /v1/live/fixtures` query params:
-
-- `page` (default: `1`)
-- `limit` (default: `20`, max: `100`)
-- `leagueId`
-- `statusShort`
-- `minElapsed`
-- `maxElapsed`
-- `teamId`
-- `sortBy` (`lastSyncedAt|matchDate|elapsed`)
-- `sortOrder` (`ASC|DESC`)
-
-Cache de lecture live:
-
-- TTL configurable via `LIVE_READ_CACHE_TTL_MS` (ms)
-- cache invalide automatiquement apres `POST /v1/live/fixtures/sync`
-
-Lot 1 targeted test suite:
-
-```bash
-$ npm run test:lot1
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- `docs/SCHEMA.md` — schéma de données de référence.
+- `docs/RUNBOOK_MYSQL.md` — exploitation de la base.
+- `../RAPPORT_PROJET.md`, `../AUDIT.md` — analyse technique du dépôt (juin 2026).
+- `../PLAN_IMPLEMENTATION.md`, `../AVIS_PRONOSTIQUEUR.md` — plan produit et avis critique (juillet 2026).
+- `../Rapport_API_SCORE_2026-08-30.docx`, `../PLAN_IMPLEMENTATION_2026-08-30.md` — état d'avancement et plan de finalisation (août 2026).

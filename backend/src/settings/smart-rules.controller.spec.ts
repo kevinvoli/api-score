@@ -81,4 +81,54 @@ describe('SmartRulesController', () => {
     expect(() => controller.updateConfig(dto)).toThrow(BadRequestException);
     expect(service.updateConfig).not.toHaveBeenCalled();
   });
+
+  // ── LOT A.6 : garde-fous de cohérence étendus ──────────────────────────
+
+  it('refuse une fenêtre non strictement croissante (ordre décroissant)', () => {
+    const dto = makeDto({
+      firstHalfRules: [
+        { maxElapsed: 30, minShots: 10 },
+        { maxElapsed: 20, minShots: 7 },
+      ],
+    });
+
+    expect(() => controller.updateConfig(dto)).toThrow(BadRequestException);
+    expect(service.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it('refuse un seuil de tirs décroissant entre deux fenêtres croissantes', () => {
+    const dto = makeDto({
+      firstHalfRules: [
+        { maxElapsed: 10, minShots: 10 },
+        { maxElapsed: 20, minShots: 7 },
+      ],
+    });
+
+    expect(() => controller.updateConfig(dto)).toThrow(BadRequestException);
+    expect(service.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it('accepte des fenêtres croissantes avec seuils non décroissants (cas limite : seuil identique)', async () => {
+    const dto = makeDto({
+      firstHalfRules: [
+        { maxElapsed: 10, minShots: 5 },
+        { maxElapsed: 20, minShots: 5 },
+        { maxElapsed: 30, minShots: 10 },
+      ],
+    });
+
+    await controller.updateConfig(dto);
+
+    expect(service.updateConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepte une unique règle de 1re mi-temps sans déclencher les gardes multi-règles', async () => {
+    const dto = makeDto({
+      firstHalfRules: [{ maxElapsed: 15, minShots: 8 }],
+    });
+
+    await controller.updateConfig(dto);
+
+    expect(service.updateConfig).toHaveBeenCalledTimes(1);
+  });
 });

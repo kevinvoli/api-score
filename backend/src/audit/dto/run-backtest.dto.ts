@@ -11,6 +11,16 @@ export class RunBacktestDto {
   @IsObject()
   strategy?: Record<string, unknown>;
 
+  /**
+   * LOT A.5 : config de règles (`SmartRulesConfig`) à tester telle quelle,
+   * typiquement la version en cours d'édition dans Paramètres — pas encore
+   * sauvegardée. Ignorée si `strategy` est fourni. Absente des deux →
+   * baseline sur la config actuellement persistée.
+   */
+  @IsOptional()
+  @IsObject()
+  entryRules?: Record<string, unknown>;
+
   @IsOptional()
   @Type(() => Date)
   @IsDate()

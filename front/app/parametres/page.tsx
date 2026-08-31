@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSmartRules, useUpdateSmartRules } from '../../lib/hooks/useSmartRules';
+import { useTestBacktestConfig } from '../../lib/hooks/useBacktest';
 import {
   DEFAULT_CONFIG, SmartRulesConfig, HalfRule, OddsConfig, ShotSignal, ScoreStateModifiers,
 } from '../../lib/api/smartRules';
@@ -75,6 +76,13 @@ function FirstHalfRuleRow({
 }
 
 // ── Bloc cotes ────────────────────────────────────────────────
+// LOT A.1/A.2/A.4 : « Edge % » et « Confiance » ont disparu. Ce ne sont pas
+// des valeurs calculées (voir AVIS_PRONOSTIQUEUR.md §1) : elles n'étaient
+// jamais lues par le moteur de suggestions, qui calcule déjà le vrai taux de
+// base par championnat (LOT 2) et l'affiche via ConfidenceValue sur les
+// pages Recommandations et Coupons. Ne reste ici que la cote de référence,
+// explicitement indicative, qui sert de valeur d'affichage par défaut tant
+// qu'aucune cote de marché réelle n'est disponible pour le match.
 function OddsBlock({
   label, value, onChange,
 }: {
@@ -86,21 +94,13 @@ function OddsBlock({
     <div className="param-odds-block">
       <p className="param-odds-label">{label}</p>
       <div className="param-odds-grid">
-        <span className="param-odds-key">Cote actuelle</span>
+        <span className="param-odds-key">Cote de référence (indicative)</span>
         <NumInput value={value.current} min={1.01} step={0.05}
           onChange={(v) => onChange({ ...value, current: v })} />
 
         <span className="param-odds-key">Cote minimum</span>
         <NumInput value={value.min} min={1.01} step={0.05}
           onChange={(v) => onChange({ ...value, min: v })} />
-
-        <span className="param-odds-key">Edge %</span>
-        <NumInput value={value.edgePct} min={0} max={100} step={0.5} suffix="%"
-          onChange={(v) => onChange({ ...value, edgePct: v })} />
-
-        <span className="param-odds-key">Confiance</span>
-        <NumInput value={value.confidence} min={0} max={100} suffix="%"
-          onChange={(v) => onChange({ ...value, confidence: v })} />
       </div>
     </div>
   );
@@ -169,6 +169,86 @@ function ScoreStateModifiersBlock({
         min={-20} max={20}
         onChange={(v) => onChange({ ...value, drawing: v })}
       />
+    </div>
+  );
+}
+
+// ── Panneau de résultat du backtest de test (LOT A.5) ──────────
+function TestBacktestPanel({ config }: { config: SmartRulesConfig }) {
+  const { mutate: runTest, data: run, isPending, error, reset } = useTestBacktestConfig();
+
+  const kpis = run?.kpis ?? null;
+
+  return (
+    <div className="param-section">
+      <h2 className="param-section-title">Tester cette configuration en backtest</h2>
+      <p className="param-section-desc">
+        Rejoue la configuration ci-dessus — y compris les modifications non encore
+        sauvegardées — sur l&apos;historique importé, sans rien changer à la
+        configuration réellement active. Utile pour voir l&apos;effet d&apos;un
+        seuil avant de le valider.
+      </p>
+
+      <div className="param-backtest-actions">
+        <button
+          type="button"
+          className="param-add-btn"
+          onClick={() => { reset(); runTest(config); }}
+          disabled={isPending}
+        >
+          {isPending ? <Loader size={14} /> : null}
+          {isPending ? 'Calcul en cours…' : 'Tester cette configuration en backtest'}
+        </button>
+      </div>
+
+      {error && (
+        <p className="param-error">
+          Le backtest a échoué : {error instanceof Error ? error.message : 'erreur inconnue'}.
+        </p>
+      )}
+
+      {kpis && (
+        <div className="param-backtest-result">
+          <div className="param-backtest-headline">
+            <div>
+              <p className="param-backtest-metric-label">Hit-rate global</p>
+              <strong className="param-backtest-metric-value">
+                {(kpis.hitRate * 100).toFixed(1)}%
+              </strong>
+            </div>
+            <div>
+              <p className="param-backtest-metric-label">Alertes résolues</p>
+              <strong className="param-backtest-metric-value">{kpis.betCount}</strong>
+            </div>
+          </div>
+
+          <p className="param-backtest-note">
+            Le ROI n&apos;est pas affiché ici : sans cotes de marché réelles au
+            moment de la décision, il ne mesure rien d&apos;exploitable pour un
+            scanner (voir AVIS_PRONOSTIQUEUR.md). Seuls le hit-rate et le volume
+            comptent pour régler ces règles.
+          </p>
+
+          <div className="param-backtest-markets">
+            {Object.entries(kpis.yieldByMarket).map(([market, stats]) => (
+              <div key={market} className="param-backtest-market-row">
+                <span className="param-backtest-market-name">{market}</span>
+                <span className="param-backtest-market-stat">
+                  {(stats.hitRate * 100).toFixed(1)}% sur {stats.bets} alerte{stats.bets > 1 ? 's' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {kpis.betCount < 500 && (
+            <p className="param-backtest-note param-backtest-note--warn">
+              Échantillon de {kpis.betCount} alertes résolues : en dessous de 500 à
+              1 000, ces chiffres ne permettent pas de distinguer un réglage
+              réellement meilleur du simple hasard.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -301,11 +381,15 @@ export default function ParametresPage() {
             </div>
           </div>
 
-          {/* ── Section Cotes & Confiance ── */}
+          {/* ── Section Cote de référence ── */}
           <div className="param-section">
-            <h2 className="param-section-title">Cotes &amp; Confiance</h2>
+            <h2 className="param-section-title">Cote de référence</h2>
             <p className="param-section-desc">
-              Valeurs par défaut appliquées à chaque suggestion générée par les règles.
+              Valeur d&apos;affichage par défaut, utilisée uniquement quand aucune cote de
+              marché réelle n&apos;est disponible pour le match. Le taux de confiance réel
+              (LOT 2, calculé par championnat sur l&apos;historique) ne se règle pas ici :
+              il s&apos;affiche automatiquement, avec sa taille d&apos;échantillon, sur les
+              pages Recommandations et Coupons.
             </p>
             <div className="param-odds-grid-outer">
               <OddsBlock
@@ -350,6 +434,9 @@ export default function ParametresPage() {
               onChange={(v) => update({ ...config, scoreStateModifiers: v })}
             />
           </div>
+
+          {/* ── Section Tester en backtest (LOT A.5) ── */}
+          <TestBacktestPanel config={config} />
 
           {/* ── Barre d'actions ── */}
           <div className="param-action-bar">

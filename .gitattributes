@@ -1,0 +1,15 @@
+# Force des fins de ligne LF pour tout fichier texte, quelle que soit la
+# configuration core.autocrlf locale (Windows/Linux mixtes sur ce dépôt).
+# Sans ce fichier, un checkout Windows regénère des CRLF sur des fichiers
+# commités en LF, produisant un diff de ~13 000 lignes qui ne contient
+# aucun changement réel (constaté le 30/08/2026).
+* text=auto eol=lf
+
+# Binaires : jamais de conversion de fin de ligne.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

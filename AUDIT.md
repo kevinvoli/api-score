@@ -6,6 +6,24 @@
 
 ---
 
+> **Mise à jour du 31/08/2026 — cet audit date d'avant trois lots de travail,
+> ne le lire qu'avec ce correctif en tête.** Depuis le 10/06, les lots
+> suivants du plan de finalisation ont été livrés et vérifiés dans le code :
+> rétention des données configurable (LOT 0), import de l'historique par
+> championnat (LOT 1), taux de base réels remplaçant la confiance inventée
+> section 12 ci-dessous (LOT 2), qualité du signal — `pressureIndex`/tirs
+> cadrés et modulation au score (LOT 3). L'authentification par clé API
+> (section 9, « CRITIQUE — Aucune authentification ») est également en place
+> depuis, et la couverture de tests (section 10, « 0 % ») est passée à plus
+> de 170 tests répartis sur 16 fichiers de specs. Le reste de ce document
+> (structure, entités, endpoints, dettes techniques, bugs P1–P3 non cités
+> ci-dessus) reste globalement valable en l'absence de ré-audit complet.
+>
+> Pour l'état d'avancement détaillé et le plan restant, voir
+> `Rapport_API_SCORE_2026-08-30.docx` et `PLAN_IMPLEMENTATION_2026-08-30.md`
+> à la racine du dépôt.
+
+
 ## 1. Structure du projet
 
 14 modules NestJS enregistrés dans `AppModule` :

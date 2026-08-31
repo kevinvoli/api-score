@@ -3,7 +3,9 @@ import {
   fetchBacktestRun,
   fetchBacktestRuns,
   runBaselineBacktest,
+  testBacktestConfig,
 } from '../api/audit';
+import type { SmartRulesConfig } from '../api/smartRules';
 
 export const useBacktestRuns = () =>
   useQuery({
@@ -24,6 +26,21 @@ export const useRunBaselineBacktest = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: runBaselineBacktest,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['backtest-runs'] });
+    },
+  });
+};
+
+/**
+ * LOT A.5 : rejoue l'historique avec une config de règles fournie explicitement
+ * (typiquement non sauvegardée), pour la page Paramètres. Le run reste visible
+ * dans l'historique Audit comme n'importe quel backtest.
+ */
+export const useTestBacktestConfig = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entryRules: SmartRulesConfig) => testBacktestConfig(entryRules),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['backtest-runs'] });
     },
