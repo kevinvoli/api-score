@@ -7,13 +7,28 @@ import type { SmartSuggestion } from '../../lib/api/smartSuggestions';
 import styles from './CouponPanel.module.css';
 
 // ── Barre de confiance ──────────────────────────────────────────
-function ConfBar({ value }: { value: number }) {
-  const pct = Math.round(Math.max(0, Math.min(100, value)));
+interface ConfBarProps {
+  confidenceScore: number | null;
+  baseRateSampleSize: number | null;
+}
+
+function ConfBar({ confidenceScore, baseRateSampleSize }: ConfBarProps) {
+  if (confidenceScore === null) {
+    return <span className={styles.confUnavailable}>Taux indisponible</span>;
+  }
+  const pct = Math.round(Math.max(0, Math.min(100, confidenceScore)));
   const color = pct >= 75 ? '#22c55e' : pct >= 60 ? '#f59e0b' : '#ef4444';
   return (
-    <div className={styles.confBar}>
-      <div className={styles.confBarFill} style={{ width: `${pct}%`, background: color }} />
-      <span className={styles.confPct} style={{ color }}>{pct}%</span>
+    <div className={styles.confBarRow}>
+      <div className={styles.confBar}>
+        <div className={styles.confBarFill} style={{ width: `${pct}%`, background: color }} />
+        <span className={styles.confPct} style={{ color }}>{pct}%</span>
+      </div>
+      {baseRateSampleSize !== null && (
+        <span className={styles.confSample}>
+          sur {baseRateSampleSize} match{baseRateSampleSize > 1 ? 's' : ''}
+        </span>
+      )}
     </div>
   );
 }
@@ -36,7 +51,7 @@ function SuggestionCard({
         <span className={styles.suggOdd}>{rec.currentOdd.toFixed(2)}</span>
       </div>
       <p className={styles.suggSelection}>{rec.selection}</p>
-      <ConfBar value={rec.confidenceScore} />
+      <ConfBar confidenceScore={rec.confidenceScore} baseRateSampleSize={rec.baseRateSampleSize} />
       {rec.shotsCount > 0 && (
         <span className={styles.suggEdge}>{rec.shotsCount} tirs · {rec.elapsed}&apos;</span>
       )}
@@ -104,7 +119,8 @@ export function CouponPanel() {
                     selection: rec.selection,
                     fixtureLabel: rec.fixtureLabel,
                     odd: rec.currentOdd,
-                    confidence: rec.confidenceScore,
+                    confidenceScore: rec.confidenceScore,
+                    baseRateSampleSize: rec.baseRateSampleSize,
                     edge: rec.edgePct,
                     riskFlags: rec.riskFlags,
                   })

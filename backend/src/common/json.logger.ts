@@ -39,7 +39,12 @@ export class JsonLogger implements LoggerService {
     this.print('verbose', message, context);
   }
 
-  private print(level: LogLevel, message: any, context?: string, trace?: string): void {
+  private print(
+    level: LogLevel,
+    message: any,
+    context?: string,
+    trace?: string,
+  ): void {
     const payload: Record<string, unknown> = {
       timestamp: new Date().toISOString(),
       level,
@@ -83,7 +88,9 @@ export class JsonLogger implements LoggerService {
             normalizedKey.includes(sensitiveKey.toLowerCase()),
           );
 
-          acc[key] = isSensitive ? '[REDACTED]' : this.redactSensitiveData(entryValue);
+          acc[key] = isSensitive
+            ? '[REDACTED]'
+            : this.redactSensitiveData(entryValue);
           return acc;
         },
         {} as Record<string, unknown>,

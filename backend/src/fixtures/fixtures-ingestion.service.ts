@@ -11,11 +11,15 @@ import { Fixture } from '../database/entities/fixture.entity';
 import { Team } from '../database/entities/team.entity';
 import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
 import { GetLiveFixturesQueryDto } from './dto/get-live-fixtures-query.dto';
-import { toNumber, getStatValue, computePressureIndex } from '../common/utils/stats.utils';
+import { toNumber, computePressureIndex } from '../common/utils/stats.utils';
+import { normalizeFixturePayload } from '../common/utils/fixture-payload.utils';
 
 @Injectable()
 export class FixturesIngestionService {
-  private readonly cache = new Map<string, { expiresAt: number; value: unknown }>();
+  private readonly cache = new Map<
+    string,
+    { expiresAt: number; value: unknown }
+  >();
   private readonly cacheTtlMs: number;
 
   constructor(
@@ -35,7 +39,10 @@ export class FixturesIngestionService {
     @InjectRepository(Team)
     private readonly teamRepository: Repository<Team>,
   ) {
-    this.cacheTtlMs = this.configService.get<number>('LIVE_READ_CACHE_TTL_MS', 30000);
+    this.cacheTtlMs = this.configService.get<number>(
+      'LIVE_READ_CACHE_TTL_MS',
+      30000,
+    );
   }
 
   async syncLiveFixtures(): Promise<{
@@ -60,10 +67,10 @@ export class FixturesIngestionService {
       }
       persistedFixtures.push(fixture);
 
-    if (fixture.leagueId) {
-      await this.upsertTeamsByLeague(fixture.leagueId);
-    }
-    await this.fillFixtureTeamsFromRepository(fixture);
+      if (fixture.leagueId) {
+        await this.upsertTeamsByLeague(fixture.leagueId);
+      }
+      await this.fillFixtureTeamsFromRepository(fixture);
 
       const fixtureId = Number(fixture.providerFixtureId);
       const events = await this.apiFootballClient.fetchFixtureEvents(fixtureId);
@@ -77,18 +84,28 @@ export class FixturesIngestionService {
           awayTeamId: fixture.awayTeamId ?? null,
         },
       );
-      statsSynced += await this.insertStatsSnapshots(fixture.id, stats, fixture.elapsed);
+      statsSynced += await this.insertStatsSnapshots(
+        fixture.id,
+        stats,
+        fixture.elapsed,
+      );
 
-      const lineups = await this.apiFootballClient.fetchFixtureLineups(fixtureId, {
-        homeTeamId: fixture.homeTeamId ?? null,
-        awayTeamId: fixture.awayTeamId ?? null,
-      });
+      const lineups = await this.apiFootballClient.fetchFixtureLineups(
+        fixtureId,
+        {
+          homeTeamId: fixture.homeTeamId ?? null,
+          awayTeamId: fixture.awayTeamId ?? null,
+        },
+      );
       lineupsSynced += await this.replaceFixtureLineups(fixture.id, lineups);
 
-      const players = await this.apiFootballClient.fetchFixturePlayers(fixtureId, {
-        homeTeamId: fixture.homeTeamId ?? null,
-        awayTeamId: fixture.awayTeamId ?? null,
-      });
+      const players = await this.apiFootballClient.fetchFixturePlayers(
+        fixtureId,
+        {
+          homeTeamId: fixture.homeTeamId ?? null,
+          awayTeamId: fixture.awayTeamId ?? null,
+        },
+      );
       playerStatsSynced += await this.insertPlayerStatsSnapshots(
         fixture.id,
         players,
@@ -118,13 +135,19 @@ export class FixturesIngestionService {
     };
   }
 
-  async getLatestFixtures(
-    query: GetLiveFixturesQueryDto,
-  ): Promise<{ items: Fixture[]; page: number; limit: number; total: number }> {
+  async getLatestFixtures(query: GetLiveFixturesQueryDto): Promise<{
+    items: (Fixture & { isStale: boolean })[];
+    page: number;
+    limit: number;
+    total: number;
+  }> {
     const cacheKey = this.buildCacheKey('fixtures:list', query);
-    const cached = this.getFromCache<{ items: Fixture[]; page: number; limit: number; total: number }>(
-      cacheKey,
-    );
+    const cached = this.getFromCache<{
+      items: (Fixture & { isStale: boolean })[];
+      page: number;
+      limit: number;
+      total: number;
+    }>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -169,16 +192,27 @@ export class FixturesIngestionService {
     qb.skip((page - 1) * limit);
     qb.take(limit);
 
-    const [items, total] = await qb.getManyAndCount();
+    const [rows, total] = await qb.getManyAndCount();
+
+    // Même convention de fraîcheur que le summary (isStale à 120 s) : un match
+    // en statut live jamais re-synchronisé (sync interrompue avant sa fin)
+    // resterait « en direct » pour toujours côté consommateurs.
+    const items = rows.map((fixture) => ({
+      ...fixture,
+      isStale:
+        fixture.lastSyncedAt instanceof Date
+          ? Date.now() - fixture.lastSyncedAt.getTime() > 120_000
+          : true,
+    }));
 
     const result = { items, page, limit, total };
     this.setCache(cacheKey, result);
     return result;
   }
 
-  async getFixturesHistory(
-    query: { limit?: number },
-  ): Promise<{ items: Fixture[]; limit: number }> {
+  async getFixturesHistory(query: {
+    limit?: number;
+  }): Promise<{ items: Fixture[]; limit: number }> {
     const limit = query.limit ?? 10;
     const items = await this.fixtureRepository.find({
       order: { matchDate: 'DESC', lastSyncedAt: 'DESC' },
@@ -292,7 +326,9 @@ export class FixturesIngestionService {
     return result;
   }
 
-  async getFixtureSummary(fixtureId: number): Promise<Record<string, unknown> | null> {
+  async getFixtureSummary(
+    fixtureId: number,
+  ): Promise<Record<string, unknown> | null> {
     const cacheKey = this.buildCacheKey('fixtures:summary', { fixtureId });
     const cached = this.getFromCache<Record<string, unknown> | null>(cacheKey);
     if (cached) {
@@ -307,35 +343,39 @@ export class FixturesIngestionService {
       return null;
     }
 
-    const [statsRows, lineupRows, playerRows, recentEvents] = await Promise.all([
-      this.fixtureStatsSnapshotRepository.find({
-        where: { fixtureId: fixture.id },
-        order: { snapshotAt: 'DESC' },
-        take: 50,
-      }),
-      this.fixtureLineupRepository.find({
-        where: { fixtureId: fixture.id },
-        order: { snapshotAt: 'DESC' },
-        take: 20,
-      }),
-      this.fixturePlayerStatsSnapshotRepository.find({
-        where: { fixtureId: fixture.id },
-        order: { snapshotAt: 'DESC' },
-        take: 500,
-      }),
-      this.fixtureEventRepository.find({
-        where: { fixtureId: fixture.id },
-        order: { minute: 'DESC', createdAt: 'DESC' },
-        take: 5,
-      }),
-    ]);
+    const [statsRows, lineupRows, playerRows, recentEvents] = await Promise.all(
+      [
+        this.fixtureStatsSnapshotRepository.find({
+          where: { fixtureId: fixture.id },
+          order: { snapshotAt: 'DESC' },
+          take: 50,
+        }),
+        this.fixtureLineupRepository.find({
+          where: { fixtureId: fixture.id },
+          order: { snapshotAt: 'DESC' },
+          take: 20,
+        }),
+        this.fixturePlayerStatsSnapshotRepository.find({
+          where: { fixtureId: fixture.id },
+          order: { snapshotAt: 'DESC' },
+          take: 500,
+        }),
+        this.fixtureEventRepository.find({
+          where: { fixtureId: fixture.id },
+          order: { minute: 'DESC', createdAt: 'DESC' },
+          take: 5,
+        }),
+      ],
+    );
 
     const latestStats = this.keepLatestSnapshotRows(statsRows);
     const latestLineups = this.keepLatestSnapshotRows(lineupRows);
     const latestPlayers = this.keepLatestSnapshotRows(playerRows);
 
-    const homeStats = latestStats.find((row) => row.teamId === fixture.homeTeamId) ?? null;
-    const awayStats = latestStats.find((row) => row.teamId === fixture.awayTeamId) ?? null;
+    const homeStats =
+      latestStats.find((row) => row.teamId === fixture.homeTeamId) ?? null;
+    const awayStats =
+      latestStats.find((row) => row.teamId === fixture.awayTeamId) ?? null;
 
     const homePressureIndex = computePressureIndex(homeStats?.stats ?? null);
     const awayPressureIndex = computePressureIndex(awayStats?.stats ?? null);
@@ -382,8 +422,8 @@ export class FixturesIngestionService {
           homePressureIndex === awayPressureIndex
             ? 'balanced'
             : homePressureIndex > awayPressureIndex
-            ? 'home'
-            : 'away',
+              ? 'home'
+              : 'away',
       },
       recentEvents: recentEvents.map((event) => ({
         minute: event.minute,
@@ -410,7 +450,9 @@ export class FixturesIngestionService {
     return summary;
   }
 
-  async getFixtureDetail(fixtureId: number): Promise<Record<string, unknown> | null> {
+  async getFixtureDetail(
+    fixtureId: number,
+  ): Promise<Record<string, unknown> | null> {
     const cacheKey = this.buildCacheKey('fixtures:detail', { fixtureId });
     const cached = this.getFromCache<Record<string, unknown> | null>(cacheKey);
     if (cached) {
@@ -459,13 +501,18 @@ export class FixturesIngestionService {
     return result;
   }
 
-  private async upsertFixture(payload: Record<string, any>): Promise<Fixture | null> {
-    const normalized = this.normalizeFixturePayload(payload);
+  private async upsertFixture(
+    payload: Record<string, any>,
+  ): Promise<Fixture | null> {
+    const normalized = normalizeFixturePayload(payload);
     if (!normalized.providerFixtureId) {
       return null;
     }
 
-    if (normalized.homeTeamId && (!normalized.homeTeamName || !normalized.homeTeamBadge)) {
+    if (
+      normalized.homeTeamId &&
+      (!normalized.homeTeamName || !normalized.homeTeamBadge)
+    ) {
       const team = await this.upsertTeamById(normalized.homeTeamId);
       if (team?.name) {
         normalized.homeTeamName = team.name;
@@ -475,7 +522,10 @@ export class FixturesIngestionService {
       }
     }
 
-    if (normalized.awayTeamId && (!normalized.awayTeamName || !normalized.awayTeamBadge)) {
+    if (
+      normalized.awayTeamId &&
+      (!normalized.awayTeamName || !normalized.awayTeamBadge)
+    ) {
       const team = await this.upsertTeamById(normalized.awayTeamId);
       if (team?.name) {
         normalized.awayTeamName = team.name;
@@ -520,7 +570,9 @@ export class FixturesIngestionService {
       return;
     }
 
-    const rows = teams.map((team) => this.normalizeTeamPayload(team, leagueId)).filter(Boolean) as Team[];
+    const rows = teams
+      .map((team) => this.normalizeTeamPayload(team, leagueId))
+      .filter(Boolean) as Team[];
     if (!rows.length) {
       return;
     }
@@ -543,17 +595,23 @@ export class FixturesIngestionService {
     return this.teamRepository.findOne({ where: { teamKey: row.teamKey } });
   }
 
-  private async fillFixtureTeamsFromRepository(fixture: Fixture): Promise<void> {
+  private async fillFixtureTeamsFromRepository(
+    fixture: Fixture,
+  ): Promise<void> {
     if (!fixture.homeTeamId && !fixture.awayTeamId) {
       return;
     }
 
     const [homeTeam, awayTeam] = await Promise.all([
       fixture.homeTeamId
-        ? this.teamRepository.findOne({ where: { teamKey: fixture.homeTeamId } })
+        ? this.teamRepository.findOne({
+            where: { teamKey: fixture.homeTeamId },
+          })
         : Promise.resolve(null),
       fixture.awayTeamId
-        ? this.teamRepository.findOne({ where: { teamKey: fixture.awayTeamId } })
+        ? this.teamRepository.findOne({
+            where: { teamKey: fixture.awayTeamId },
+          })
         : Promise.resolve(null),
     ]);
 
@@ -576,13 +634,15 @@ export class FixturesIngestionService {
     }
   }
 
-  private normalizeTeamPayload(payload: Record<string, any>, leagueId: number | null): Team | null {
-    const teamKey = toNumber(payload?.team_key ?? payload?.team?.id ?? payload?.team_id);
+  private normalizeTeamPayload(
+    payload: Record<string, any>,
+    leagueId: number | null,
+  ): Team | null {
+    const teamKey = toNumber(
+      payload?.team_key ?? payload?.team?.id ?? payload?.team_id,
+    );
     const name =
-      payload?.team_name ??
-      payload?.team?.name ??
-      payload?.name ??
-      null;
+      payload?.team_name ?? payload?.team?.name ?? payload?.name ?? null;
 
     if (!teamKey || !name) {
       return null;
@@ -595,24 +655,29 @@ export class FixturesIngestionService {
       id: undefined as unknown as string,
       teamKey,
       name,
-      code:
-        payload?.team_code ??
-        payload?.team?.code ??
-        payload?.code ??
+      code: payload?.team_code ?? payload?.team?.code ?? payload?.code ?? null,
+      country:
+        payload?.team_country ??
+        payload?.team?.country ??
+        payload?.country ??
         null,
-      country: payload?.team_country ?? payload?.team?.country ?? payload?.country ?? null,
-      founded: toNumber(payload?.team_founded ?? payload?.team?.founded ?? payload?.founded),
+      founded: toNumber(
+        payload?.team_founded ?? payload?.team?.founded ?? payload?.founded,
+      ),
       national:
         payload?.team_national ??
         payload?.team?.national ??
         payload?.national ??
         null,
-      badge: payload?.team_badge ?? payload?.team?.logo ?? payload?.logo ?? null,
+      badge:
+        payload?.team_badge ?? payload?.team?.logo ?? payload?.logo ?? null,
       venueId,
       venueName: venuePayload?.name ?? payload?.venue_name ?? null,
       venueAddress: venuePayload?.address ?? payload?.venue_address ?? null,
       venueCity: venuePayload?.city ?? payload?.venue_city ?? null,
-      venueCapacity: toNumber(venuePayload?.capacity ?? payload?.venue_capacity),
+      venueCapacity: toNumber(
+        venuePayload?.capacity ?? payload?.venue_capacity,
+      ),
       venueSurface: venuePayload?.surface ?? payload?.venue_surface ?? null,
       venueImage: venuePayload?.image ?? payload?.venue_image ?? null,
       venue: venuePayload,
@@ -716,8 +781,11 @@ export class FixturesIngestionService {
     }> = [];
 
     for (const teamEntry of playersPayload) {
-      const teamId = teamEntry?.team?.id ?? toNumber(teamEntry?.team_id) ?? null;
-      const players = Array.isArray(teamEntry?.players) ? teamEntry.players : [];
+      const teamId =
+        teamEntry?.team?.id ?? toNumber(teamEntry?.team_id) ?? null;
+      const players = Array.isArray(teamEntry?.players)
+        ? teamEntry.players
+        : [];
 
       for (const player of players) {
         rows.push({
@@ -738,108 +806,9 @@ export class FixturesIngestionService {
     return rows.length;
   }
 
-  private normalizeFixturePayload(payload: Record<string, any>): {
-    providerFixtureId: string | null;
-    leagueId: number | null;
-    leagueName: string | null;
-    season: number | null;
-    homeTeamId: number | null;
-    awayTeamId: number | null;
-    homeTeamName: string | null;
-    awayTeamName: string | null;
-    homeTeamBadge: string | null;
-    awayTeamBadge: string | null;
-    statusShort: string | null;
-    statusLong: string | null;
-    elapsed: number | null;
-    matchDate: Date | null;
-    scoreHome: number | null;
-    scoreAway: number | null;
-  } {
-    const apiSportsFixture = payload?.fixture ?? null;
-    const legacyFixtureId = payload?.match_id ? String(payload.match_id) : null;
-    const providerFixtureId = apiSportsFixture?.id
-      ? String(apiSportsFixture.id)
-      : legacyFixtureId;
-
-    return {
-      providerFixtureId,
-      leagueId: payload?.league?.id ?? toNumber(payload?.league_id) ?? null,
-      leagueName:
-        payload?.league?.name ??
-        payload?.league?.league_name ??
-        payload?.league_name ??
-        null,
-      season: payload?.league?.season ?? toNumber(payload?.league_year) ?? null,
-      homeTeamId: payload?.teams?.home?.id ?? toNumber(payload?.match_hometeam_id) ?? null,
-      awayTeamId: payload?.teams?.away?.id ?? toNumber(payload?.match_awayteam_id) ?? null,
-      homeTeamName:
-        payload?.teams?.home?.name ??
-        payload?.match_hometeam_name ??
-        null,
-      awayTeamName:
-        payload?.teams?.away?.name ??
-        payload?.match_awayteam_name ??
-        null,
-      homeTeamBadge:
-        payload?.teams?.home?.logo ??
-        payload?.team_home_badge ??
-        null,
-      awayTeamBadge:
-        payload?.teams?.away?.logo ??
-        payload?.team_away_badge ??
-        null,
-      statusShort: apiSportsFixture?.status?.short ?? this.normalizeApifootballStatus(payload?.match_status),
-      statusLong: apiSportsFixture?.status?.long ?? payload?.match_status ?? null,
-      elapsed: apiSportsFixture?.status?.elapsed ?? toNumber(payload?.match_status) ?? null,
-      matchDate: apiSportsFixture?.date ? new Date(apiSportsFixture.date) : this.toDate(payload?.match_date),
-      scoreHome:
-        payload?.goals?.home ??
-        toNumber(payload?.match_hometeam_score) ??
-        null,
-      scoreAway:
-        payload?.goals?.away ??
-        toNumber(payload?.match_awayteam_score) ??
-        null,
-    };
-  }
-
-
-  private toDate(value: unknown): Date | null {
-    if (!value || typeof value !== 'string') {
-      return null;
-    }
-
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  /**
-   * Normalise le champ match_status d'apifootball.com en code api-sports standard.
-   * - ""          → "NS"   (Not Started)
-   * - "75" etc.   → "LIVE" (en cours, la valeur numérique = minutes écoulées)
-   * - "HT","FT","AET","ET","P","1H","2H" → inchangés (déjà compatibles)
-   * - "Cancelled" → "CANC", "Postponed" → "PST", etc.
-   */
-  private normalizeApifootballStatus(raw: string | null | undefined): string | null {
-    if (raw === null || raw === undefined) return null;
-    if (raw === '') return 'NS';
-    if (/^\d+(\+\d+)?$/.test(raw)) return 'LIVE'; // "75", "45+2", etc.
-    const MAP: Record<string, string> = {
-      Cancelled:      'CANC',
-      Postponed:      'PST',
-      Interrupted:    'INT',
-      Abandoned:      'ABD',
-      Awarded:        'AWD',
-      Suspended:      'SUSP',
-      'Not Coverage': 'NS',
-      // apifootball termine parfois les matchs aux tirs au but avec 'Pen.'
-      'Pen.':         'PEN',
-    };
-    return MAP[raw] ?? raw;
-  }
-
-  private keepLatestSnapshotRows<T extends { snapshotAt: Date }>(rows: T[]): T[] {
+  private keepLatestSnapshotRows<T extends { snapshotAt: Date }>(
+    rows: T[],
+  ): T[] {
     if (!rows.length) {
       return [];
     }
@@ -847,8 +816,6 @@ export class FixturesIngestionService {
     const latestSnapshot = rows[0].snapshotAt.getTime();
     return rows.filter((row) => row.snapshotAt.getTime() === latestSnapshot);
   }
-
-
 
   private buildCacheKey(scope: string, payload: unknown): string {
     return `${scope}:${JSON.stringify(payload)}`;
@@ -880,7 +847,9 @@ export class FixturesIngestionService {
       score -= 18;
     }
 
-    const pressureGap = Math.abs(input.homePressureIndex - input.awayPressureIndex);
+    const pressureGap = Math.abs(
+      input.homePressureIndex - input.awayPressureIndex,
+    );
     if (pressureGap >= 8) {
       score += 5;
     } else if (pressureGap <= 1) {

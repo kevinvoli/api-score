@@ -12,7 +12,9 @@ export class TeamsService {
 
   async getTeams(query: { leagueId?: number; limit?: number }) {
     const limit = query.limit ?? 100;
-    const qb = this.teamRepository.createQueryBuilder('team').orderBy('team.name', 'ASC');
+    const qb = this.teamRepository
+      .createQueryBuilder('team')
+      .orderBy('team.name', 'ASC');
     if (query.leagueId !== undefined) {
       qb.andWhere('team.leagueId = :leagueId', { leagueId: query.leagueId });
     }

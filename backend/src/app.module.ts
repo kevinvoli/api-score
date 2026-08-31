@@ -18,6 +18,10 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
 import { ArchiveModule } from './archive/archive.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { TeamsModule } from './teams/teams.module';
+import { OddsModule } from './odds/odds.module';
+import { BacktestModule } from './backtest/backtest.module';
+import { AuditModule } from './audit/audit.module';
+import { HistoryModule } from './history/history.module';
 
 @Module({
   imports: [
@@ -34,12 +38,13 @@ import { TeamsModule } from './teams/teams.module';
     ArchiveModule,
     AnalyticsModule,
     TeamsModule,
+    OddsModule,
+    BacktestModule,
+    AuditModule,
+    HistoryModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    { provide: APP_GUARD, useClass: ApiKeyGuard },
-  ],
+  providers: [AppService, { provide: APP_GUARD, useClass: ApiKeyGuard }],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

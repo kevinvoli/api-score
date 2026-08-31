@@ -11,12 +11,23 @@ const LIVE_STATUSES = new Set(['1H', '2H', 'ET', 'P', 'LIVE', 'INT', 'BT']);
 const HT_STATUSES  = new Set(['HT', 'BT']);
 const FT_STATUSES  = new Set(['FT', 'AET', 'PEN', 'AWD', 'WO', 'ABD']);
 
-function StatusCell({ statusShort, elapsed, matchDate }: {
+function StatusCell({ statusShort, elapsed, matchDate, isStale }: {
   statusShort: string | null;
   elapsed: number | null;
   matchDate: string | null;
+  isStale?: boolean;
 }) {
   const s = statusShort ?? '';
+
+  // Statut live mais données jamais re-synchronisées (sync interrompue avant
+  // la fin du match) : afficher la minute qui « tourne » serait mensonger.
+  if (isStale && (LIVE_STATUSES.has(s) || HT_STATUSES.has(s))) {
+    return (
+      <div className={styles.statusTime} title="Données non synchronisées depuis la fin du suivi">
+        Figé
+      </div>
+    );
+  }
 
   if (LIVE_STATUSES.has(s)) {
     return (
@@ -68,6 +79,7 @@ export function MatchRow({ fixture, scoreChanged = false, onAnalyze }: Props) {
         statusShort={fixture.statusShort}
         elapsed={fixture.elapsed}
         matchDate={fixture.matchDate}
+        isStale={fixture.isStale}
       />
 
       {/* Colonne match : [équipe dom] [score] [équipe ext] */}

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { CouponSelectionRow } from '../../components/coupon-selection-row/CouponSelectionRow';
+import { ConfidenceValue } from '../../components/confidence-value/ConfidenceValue';
 import { useLiveFixtures } from '../../lib/hooks/useLiveFixtures';
 import { useCouponBuilderStore } from '../../lib/state/couponBuilder';
 import { useUiControlsStore } from '../../lib/state/uiControls';
@@ -46,9 +47,12 @@ function CouponHistoryRow({ coupon }: { coupon: SmartCoupon }) {
         {coupon.currentOdd !== null && (
           <span className="coupon-hist-odd">{Number(coupon.currentOdd).toFixed(2)}</span>
         )}
-        {coupon.confidenceScore !== null && (
-          <span className="coupon-hist-conf">{coupon.confidenceScore}%</span>
-        )}
+        <ConfidenceValue
+          confidenceScore={coupon.confidenceScore}
+          baseRateSampleSize={coupon.baseRateSampleSize}
+          layout="inline"
+          className="coupon-hist-conf"
+        />
         <span className="coupon-hist-date">{date}</span>
         {coupon.resolvedAt && (
           <span className="coupon-hist-resolved">
@@ -135,7 +139,8 @@ export default function CouponsPage() {
               marketType="Recommandation"
               fixtureLabel={selection.fixtureLabel}
               odd={selection.odd}
-              confidence={selection.confidence}
+              confidenceScore={selection.confidenceScore}
+              baseRateSampleSize={selection.baseRateSampleSize}
               edgePct={selection.edge}
               riskFlags={selection.riskFlags}
               correlation={selection.edge >= 7 ? 'high' : selection.edge >= 4 ? 'medium' : 'low'}

@@ -54,6 +54,7 @@ export type SmartCoupon = {
   minAcceptableOdd: number | null;
   edgePct: number | null;
   confidenceScore: number | null;
+  baseRateSampleSize: number | null;
   reasons: string[] | null;
   ruleName: string | null;
   elapsedAtSuggestion: number | null;

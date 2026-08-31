@@ -57,7 +57,8 @@ export class ProviderController {
   ) {
     if (!leagueId) throw new BadRequestException('leagueId is required');
     const parsedLeague = Number(leagueId);
-    if (Number.isNaN(parsedLeague)) throw new BadRequestException('leagueId must be a number');
+    if (Number.isNaN(parsedLeague))
+      throw new BadRequestException('leagueId must be a number');
 
     if (refresh !== 'true') {
       const cached = await this.persistence.findTeamsByLeague(parsedLeague);
@@ -81,9 +82,15 @@ export class ProviderController {
   ) {
     if (!leagueId) throw new BadRequestException('leagueId is required');
     const parsedLeague = Number(leagueId);
-    if (Number.isNaN(parsedLeague)) throw new BadRequestException('leagueId must be a number');
-    const matches = await this.apiFootballClient.fetchLeagueFixtures(parsedLeague, from, to);
-    if (matches.length) await this.persistence.persistMatches(parsedLeague, matches);
+    if (Number.isNaN(parsedLeague))
+      throw new BadRequestException('leagueId must be a number');
+    const matches = await this.apiFootballClient.fetchLeagueFixtures(
+      parsedLeague,
+      from,
+      to,
+    );
+    if (matches.length)
+      await this.persistence.persistMatches(parsedLeague, matches);
     return matches;
   }
 
@@ -94,9 +101,11 @@ export class ProviderController {
   async getStandings(@Query('leagueId') leagueId?: string) {
     if (!leagueId) throw new BadRequestException('leagueId is required');
     const parsedLeague = Number(leagueId);
-    if (Number.isNaN(parsedLeague)) throw new BadRequestException('leagueId must be a number');
+    if (Number.isNaN(parsedLeague))
+      throw new BadRequestException('leagueId must be a number');
     const data = await this.apiFootballClient.fetchStandings(parsedLeague);
-    if (data.length) await this.persistence.persistStandings(parsedLeague, data);
+    if (data.length)
+      await this.persistence.persistStandings(parsedLeague, data);
     return this.persistence.getStandings(parsedLeague);
   }
 }

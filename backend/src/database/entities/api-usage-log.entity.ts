@@ -41,4 +41,3 @@ export class ApiUsageLog {
   @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
 }
-

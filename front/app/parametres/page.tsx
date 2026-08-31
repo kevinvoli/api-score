@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useSmartRules, useUpdateSmartRules } from '../../lib/hooks/useSmartRules';
-import { DEFAULT_CONFIG, SmartRulesConfig, HalfRule, OddsConfig } from '../../lib/api/smartRules';
+import {
+  DEFAULT_CONFIG, SmartRulesConfig, HalfRule, OddsConfig, ShotSignal, ScoreStateModifiers,
+} from '../../lib/api/smartRules';
 import { Loader } from '../../components/loader/Loader';
 
 // ── Champ numérique inline ────────────────────────────────────
@@ -104,6 +106,73 @@ function OddsBlock({
   );
 }
 
+// ── Sélecteur du signal offensif ──────────────────────────────
+const SIGNAL_OPTIONS: { value: ShotSignal; label: string }[] = [
+  { value: 'TOTAL_SHOTS',    label: 'Total des tirs' },
+  { value: 'ON_TARGET',      label: 'Tirs cadrés' },
+  { value: 'PRESSURE_INDEX', label: 'Indice de pression' },
+];
+
+function SignalSelector({
+  value, onChange,
+}: {
+  value: ShotSignal;
+  onChange: (v: ShotSignal) => void;
+}) {
+  return (
+    <div className="param-radio-group" role="radiogroup" aria-label="Signal de déclenchement">
+      {SIGNAL_OPTIONS.map((opt) => (
+        <label
+          key={opt.value}
+          className={`param-radio-option${value === opt.value ? ' param-radio-option--active' : ''}`}
+        >
+          <input
+            type="radio"
+            name="shot-signal"
+            value={opt.value}
+            checked={value === opt.value}
+            onChange={() => onChange(opt.value)}
+          />
+          {opt.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// ── Bloc modulation selon l'état au score ─────────────────────
+function ScoreStateModifiersBlock({
+  value, onChange,
+}: {
+  value: ScoreStateModifiers;
+  onChange: (v: ScoreStateModifiers) => void;
+}) {
+  return (
+    <div className="param-odds-grid">
+      <span className="param-odds-key">Quand l&apos;équipe mène</span>
+      <NumInput
+        value={value.leading}
+        min={-20} max={20}
+        onChange={(v) => onChange({ ...value, leading: v })}
+      />
+
+      <span className="param-odds-key">Quand l&apos;équipe est menée</span>
+      <NumInput
+        value={value.trailing}
+        min={-20} max={20}
+        onChange={(v) => onChange({ ...value, trailing: v })}
+      />
+
+      <span className="param-odds-key">Match nul</span>
+      <NumInput
+        value={value.drawing}
+        min={-20} max={20}
+        onChange={(v) => onChange({ ...value, drawing: v })}
+      />
+    </div>
+  );
+}
+
 // ── Page principale ───────────────────────────────────────────
 export default function ParametresPage() {
   const { data: remote, isLoading, error } = useSmartRules();
@@ -143,6 +212,9 @@ export default function ParametresPage() {
   };
 
   const reset = () => { setConfig(remote ?? DEFAULT_CONFIG); setDirty(false); };
+
+  const signal = config.signal ?? 'TOTAL_SHOTS';
+  const scoreStateModifiers = config.scoreStateModifiers ?? { leading: 0, trailing: 0, drawing: 0 };
 
   return (
     <section className="content">
@@ -252,6 +324,31 @@ export default function ParametresPage() {
                 onChange={(v) => update({ ...config, odds: { ...config.odds, secondHalf: v } })}
               />
             </div>
+          </div>
+
+          {/* ── Section Signal de déclenchement ── */}
+          <div className="param-section">
+            <h2 className="param-section-title">Signal de déclenchement</h2>
+            <p className="param-section-desc">
+              Métrique comparée aux seuils de tirs des règles.
+            </p>
+            <SignalSelector
+              value={signal}
+              onChange={(v) => update({ ...config, signal: v })}
+            />
+          </div>
+
+          {/* ── Section Modulation selon l'état au score ── */}
+          <div className="param-section">
+            <h2 className="param-section-title">Modulation selon l&apos;état au score</h2>
+            <p className="param-section-desc">
+              Ajusté au seuil de tirs : négatif = alerte plus tôt (équipe menée qui pousse),
+              positif = plus exigeant.
+            </p>
+            <ScoreStateModifiersBlock
+              value={scoreStateModifiers}
+              onChange={(v) => update({ ...config, scoreStateModifiers: v })}
+            />
           </div>
 
           {/* ── Barre d'actions ── */}

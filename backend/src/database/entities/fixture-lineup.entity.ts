@@ -46,4 +46,3 @@ export class FixtureLineup {
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 }
-

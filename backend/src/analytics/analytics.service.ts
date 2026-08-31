@@ -5,7 +5,11 @@ import { FixtureAnalytics } from '../database/entities/fixture-analytics.entity'
 import { FixtureEvent } from '../database/entities/fixture-event.entity';
 import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapshot.entity';
 import { Fixture } from '../database/entities/fixture.entity';
-import { toNumber, getStatValue, computePressureIndex } from '../common/utils/stats.utils';
+import {
+  toNumber,
+  getStatValue,
+  computePressureIndex,
+} from '../common/utils/stats.utils';
 
 @Injectable()
 export class AnalyticsService {
@@ -20,7 +24,9 @@ export class AnalyticsService {
     private readonly eventsRepository: Repository<FixtureEvent>,
   ) {}
 
-  async getLatestForFixture(fixtureId: string): Promise<FixtureAnalytics | null> {
+  async getLatestForFixture(
+    fixtureId: string,
+  ): Promise<FixtureAnalytics | null> {
     return this.analyticsRepository.findOne({
       where: { fixtureId },
       order: { computedAt: 'DESC' },
@@ -28,7 +34,9 @@ export class AnalyticsService {
   }
 
   async recomputeFixture(fixtureId: string): Promise<FixtureAnalytics | null> {
-    const fixture = await this.fixtureRepository.findOne({ where: { id: fixtureId } });
+    const fixture = await this.fixtureRepository.findOne({
+      where: { id: fixtureId },
+    });
     if (!fixture) {
       return null;
     }
@@ -49,8 +57,10 @@ export class AnalyticsService {
       take: 200,
     });
 
-    const homeStats = latestStats.find((row) => row.teamId === fixture.homeTeamId) ?? null;
-    const awayStats = latestStats.find((row) => row.teamId === fixture.awayTeamId) ?? null;
+    const homeStats =
+      latestStats.find((row) => row.teamId === fixture.homeTeamId) ?? null;
+    const awayStats =
+      latestStats.find((row) => row.teamId === fixture.awayTeamId) ?? null;
 
     const metrics = {
       fixtureId,
@@ -62,24 +72,48 @@ export class AnalyticsService {
         away: computePressureIndex(awayStats?.stats ?? null),
       },
       possession: {
-        home: getStatValue(homeStats?.stats ?? null, ['Ball Possession', 'Possession']),
-        away: getStatValue(awayStats?.stats ?? null, ['Ball Possession', 'Possession']),
+        home: getStatValue(homeStats?.stats ?? null, [
+          'Ball Possession',
+          'Possession',
+        ]),
+        away: getStatValue(awayStats?.stats ?? null, [
+          'Ball Possession',
+          'Possession',
+        ]),
       },
       shots: {
         home: getStatValue(homeStats?.stats ?? null, ['Total Shots', 'Shots']),
         away: getStatValue(awayStats?.stats ?? null, ['Total Shots', 'Shots']),
       },
       onTarget: {
-        home: getStatValue(homeStats?.stats ?? null, ['On Target', 'Shots on Goal']),
-        away: getStatValue(awayStats?.stats ?? null, ['On Target', 'Shots on Goal']),
+        home: getStatValue(homeStats?.stats ?? null, [
+          'On Target',
+          'Shots on Goal',
+        ]),
+        away: getStatValue(awayStats?.stats ?? null, [
+          'On Target',
+          'Shots on Goal',
+        ]),
       },
       offTarget: {
-        home: getStatValue(homeStats?.stats ?? null, ['Off Target', 'Shots off Goal']),
-        away: getStatValue(awayStats?.stats ?? null, ['Off Target', 'Shots off Goal']),
+        home: getStatValue(homeStats?.stats ?? null, [
+          'Off Target',
+          'Shots off Goal',
+        ]),
+        away: getStatValue(awayStats?.stats ?? null, [
+          'Off Target',
+          'Shots off Goal',
+        ]),
       },
       corners: {
-        home: getStatValue(homeStats?.stats ?? null, ['Corner Kicks', 'Corners']),
-        away: getStatValue(awayStats?.stats ?? null, ['Corner Kicks', 'Corners']),
+        home: getStatValue(homeStats?.stats ?? null, [
+          'Corner Kicks',
+          'Corners',
+        ]),
+        away: getStatValue(awayStats?.stats ?? null, [
+          'Corner Kicks',
+          'Corners',
+        ]),
       },
       fouls: {
         home: getStatValue(homeStats?.stats ?? null, ['Fouls']),
@@ -106,8 +140,14 @@ export class AnalyticsService {
         away: this.extractPasses(awayStats?.stats ?? null),
       },
       cards: {
-        home: events.filter((event) => event.teamId === fixture.homeTeamId && event.eventType === 'Card').length,
-        away: events.filter((event) => event.teamId === fixture.awayTeamId && event.eventType === 'Card').length,
+        home: events.filter(
+          (event) =>
+            event.teamId === fixture.homeTeamId && event.eventType === 'Card',
+        ).length,
+        away: events.filter(
+          (event) =>
+            event.teamId === fixture.awayTeamId && event.eventType === 'Card',
+        ).length,
       },
       yellowCards: {
         home: this.countCards(events, fixture.homeTeamId, 'yellow'),
@@ -118,8 +158,14 @@ export class AnalyticsService {
         away: this.countCards(events, fixture.awayTeamId, 'red'),
       },
       goals: {
-        home: events.filter((event) => event.teamId === fixture.homeTeamId && event.eventType === 'Goal').length,
-        away: events.filter((event) => event.teamId === fixture.awayTeamId && event.eventType === 'Goal').length,
+        home: events.filter(
+          (event) =>
+            event.teamId === fixture.homeTeamId && event.eventType === 'Goal',
+        ).length,
+        away: events.filter(
+          (event) =>
+            event.teamId === fixture.awayTeamId && event.eventType === 'Goal',
+        ).length,
       },
       recentEventsCount: events.length,
     };
@@ -132,7 +178,9 @@ export class AnalyticsService {
     return this.getLatestForFixture(fixtureId);
   }
 
-  async getLatest(limit = 10): Promise<{ items: FixtureAnalytics[]; limit: number }> {
+  async getLatest(
+    limit = 10,
+  ): Promise<{ items: FixtureAnalytics[]; limit: number }> {
     const items = await this.analyticsRepository.find({
       order: { computedAt: 'DESC' },
       take: limit,
@@ -140,7 +188,9 @@ export class AnalyticsService {
     return { items, limit };
   }
 
-  async recomputeLatest(limit = 10): Promise<{ items: FixtureAnalytics[]; limit: number }> {
+  async recomputeLatest(
+    limit = 10,
+  ): Promise<{ items: FixtureAnalytics[]; limit: number }> {
     const fixtures = await this.fixtureRepository.find({
       order: { matchDate: 'DESC', lastSyncedAt: 'DESC' },
       take: limit,
@@ -157,9 +207,6 @@ export class AnalyticsService {
     return { items: results, limit };
   }
 
-
-
-
   private extractPasses(statsPayload: Record<string, unknown> | null): {
     total: number;
     accurate: number;
@@ -173,21 +220,29 @@ export class AnalyticsService {
     if (legacyPasses && typeof legacyPasses === 'object') {
       const total = toNumber(legacyPasses.total) ?? 0;
       const accurate = toNumber(legacyPasses.accurate) ?? 0;
-      const accuracy = toNumber(
-        typeof legacyPasses.accuracy === 'string'
-          ? legacyPasses.accuracy.replace('%', '')
-          : legacyPasses.accuracy,
-      ) ?? 0;
+      const accuracy =
+        toNumber(
+          typeof legacyPasses.accuracy === 'string'
+            ? legacyPasses.accuracy.replace('%', '')
+            : legacyPasses.accuracy,
+        ) ?? 0;
       return { total, accurate, accuracy };
     }
 
     const total = getStatValue(statsPayload, ['Total Passes', 'Passes']);
-    const accurate = getStatValue(statsPayload, ['Accurate Passes', 'Pass Accuracy']);
+    const accurate = getStatValue(statsPayload, [
+      'Accurate Passes',
+      'Pass Accuracy',
+    ]);
     const accuracy = total > 0 ? Math.round((accurate / total) * 100) : 0;
     return { total, accurate, accuracy };
   }
 
-  private countCards(events: FixtureEvent[], teamId: number | null, type: 'yellow' | 'red'): number {
+  private countCards(
+    events: FixtureEvent[],
+    teamId: number | null,
+    type: 'yellow' | 'red',
+  ): number {
     if (!teamId) {
       return 0;
     }

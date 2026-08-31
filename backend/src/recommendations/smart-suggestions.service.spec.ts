@@ -5,8 +5,12 @@ import { Fixture } from '../database/entities/fixture.entity';
 import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapshot.entity';
 import { BetRecommendation } from '../database/entities/bet-recommendation.entity';
 import { SmartCoupon } from '../database/entities/smart-coupon.entity';
-import { SmartRulesConfigService, DEFAULT_CONFIG } from '../settings/smart-rules-config.service';
+import {
+  SmartRulesConfigService,
+  DEFAULT_CONFIG,
+} from '../settings/smart-rules-config.service';
 import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
+import { BaseRatesService } from '../analytics/base-rates.service';
 import { JsonLogger } from '../common/json.logger';
 
 // ── Factories ────────────────────────────────────────────────
@@ -96,9 +100,7 @@ function makeStatsSnapshot(
     half: null,
     elapsed,
     stats: {
-      statistics: [
-        { type: 'Total Shots', value: shots },
-      ],
+      statistics: [{ type: 'Total Shots', value: shots }],
     },
     snapshotAt: new Date(),
     createdAt: new Date(),
@@ -116,28 +118,36 @@ describe('SmartSuggestionsService', () => {
   let couponRepo: ReturnType<typeof mockRepository>;
   let configService: { getConfig: jest.Mock };
   let apiClient: { fetchAllLiveOdds: jest.Mock; fetchLiveFixtures?: jest.Mock };
+  let baseRatesService: { buildLookup: jest.Mock };
   let logger: { log: jest.Mock; warn: jest.Mock; error: jest.Mock };
 
   beforeEach(async () => {
     fixtureRepo = mockRepository();
-    statsRepo   = mockRepository();
-    recoRepo    = mockRepository();
-    couponRepo  = mockRepository();
+    statsRepo = mockRepository();
+    recoRepo = mockRepository();
+    couponRepo = mockRepository();
 
     configService = { getConfig: jest.fn().mockResolvedValue(DEFAULT_CONFIG) };
-    apiClient     = { fetchAllLiveOdds: jest.fn().mockResolvedValue(new Map()) };
-    logger        = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+    apiClient = { fetchAllLiveOdds: jest.fn().mockResolvedValue(new Map()) };
+    baseRatesService = {
+      buildLookup: jest.fn().mockResolvedValue(new Map()),
+    };
+    logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SmartSuggestionsService,
-        { provide: getRepositoryToken(Fixture),             useValue: fixtureRepo },
-        { provide: getRepositoryToken(FixtureStatsSnapshot), useValue: statsRepo },
-        { provide: getRepositoryToken(BetRecommendation),  useValue: recoRepo },
-        { provide: getRepositoryToken(SmartCoupon),        useValue: couponRepo },
-        { provide: SmartRulesConfigService,                useValue: configService },
-        { provide: ApiFootballClient,                      useValue: apiClient },
-        { provide: JsonLogger,                             useValue: logger },
+        { provide: getRepositoryToken(Fixture), useValue: fixtureRepo },
+        {
+          provide: getRepositoryToken(FixtureStatsSnapshot),
+          useValue: statsRepo,
+        },
+        { provide: getRepositoryToken(BetRecommendation), useValue: recoRepo },
+        { provide: getRepositoryToken(SmartCoupon), useValue: couponRepo },
+        { provide: SmartRulesConfigService, useValue: configService },
+        { provide: ApiFootballClient, useValue: apiClient },
+        { provide: BaseRatesService, useValue: baseRatesService },
+        { provide: JsonLogger, useValue: logger },
       ],
     }).compile();
 
@@ -148,10 +158,10 @@ describe('SmartSuggestionsService', () => {
 
   function makeQbReturning(entities: unknown[]) {
     const qb = {
-      where:    jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
-      orderBy:  jest.fn().mockReturnThis(),
-      getMany:  jest.fn().mockResolvedValue(entities),
+      orderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue(entities),
     };
     return qb;
   }
@@ -165,14 +175,17 @@ describe('SmartSuggestionsService', () => {
      * On utilise mockResolvedValueOnce pour contrôler les résultats successifs
      * du même mock sans risque de race condition.
      */
-    function setupEvaluateFixturesMocks(fixtureResults: Fixture[][], snapResults: FixtureStatsSnapshot[][]) {
+    function setupEvaluateFixturesMocks(
+      fixtureResults: Fixture[][],
+      snapResults: FixtureStatsSnapshot[][],
+    ) {
       // fixtureRepo.createQueryBuilder est appelé une fois pour 1H, une fois pour 2H
       fixtureRepo.createQueryBuilder.mockImplementation(() => {
         const qb = {
-          where:    jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
           andWhere: jest.fn().mockReturnThis(),
-          orderBy:  jest.fn().mockReturnThis(),
-          getMany:  jest.fn(),
+          orderBy: jest.fn().mockReturnThis(),
+          getMany: jest.fn(),
         };
         qb.getMany
           .mockResolvedValueOnce(fixtureResults[0] ?? [])
@@ -192,7 +205,7 @@ describe('SmartSuggestionsService', () => {
     it('crée une suggestion quand la règle 1ère MT est déclenchée (minute=25, shots=12 ≥ seuil 10, maxElapsed=30)', async () => {
       // La règle { maxElapsed: 30, minShots: 10 } s'applique quand elapsed < 30 ET shots >= 10
       const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
-      const snap    = makeStatsSnapshot(fixture.id, 10, 12);
+      const snap = makeStatsSnapshot(fixture.id, 10, 12);
 
       // 1er appel fixtureRepo → fixtures 1H ; 2e appel → fixtures 2H (vide)
       // 1er appel statsRepo → snapshots pour evaluateFixtures 1H
@@ -211,10 +224,52 @@ describe('SmartSuggestionsService', () => {
       expect(savedEntities.length).toBeGreaterThanOrEqual(1);
     });
 
+    it("branche confidenceScore sur le taux de base réel (%) et sa taille d'échantillon", async () => {
+      const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
+      const snap = makeStatsSnapshot(fixture.id, 10, 12);
+      setupEvaluateFixturesMocks([[fixture], []], [[snap]]);
+
+      // Taux réel seulement pour goal_1h au seuil 10 (leagueId 39, saison 2024).
+      // goal_ft (Buts match) au même seuil n'a pas de taux → confidence null.
+      baseRatesService.buildLookup.mockResolvedValue(
+        new Map([
+          ['39|2024|goal_1h|10', { observedRate: 0.68, sampleSize: 340 }],
+        ]),
+      );
+
+      couponRepo.findOne.mockResolvedValue(null);
+      couponRepo.find.mockResolvedValue([]);
+      recoRepo.delete.mockResolvedValue({});
+      recoRepo.save.mockResolvedValue([]);
+      couponRepo.save.mockResolvedValue({});
+
+      await service.evaluateAndSave();
+
+      const saved: Array<{
+        marketType: string;
+        confidenceScore: number | null;
+        baseRateSampleSize: number | null;
+      }> = recoRepo.save.mock.calls[0][0];
+
+      const firstHalf = saved.find(
+        (s) => s.marketType === 'Buts 1ère mi-temps',
+      );
+      expect(firstHalf).toMatchObject({
+        confidenceScore: 68,
+        baseRateSampleSize: 340,
+      });
+
+      const fullMatch = saved.find((s) => s.marketType === 'Buts match');
+      expect(fullMatch).toMatchObject({
+        confidenceScore: null,
+        baseRateSampleSize: null,
+      });
+    });
+
     it('ne crée aucune suggestion quand shots insuffisants (shots=5, seuil=10 à elapsed=25)', async () => {
       // elapsed=25 correspond à la règle { maxElapsed: 30, minShots: 10 } mais shots=5 < 10
       const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
-      const snap    = makeStatsSnapshot(fixture.id, 10, 5);
+      const snap = makeStatsSnapshot(fixture.id, 10, 5);
 
       setupEvaluateFixturesMocks([[fixture], []], [[snap]]);
       couponRepo.find.mockResolvedValue([]);
@@ -223,6 +278,42 @@ describe('SmartSuggestionsService', () => {
 
       expect(recoRepo.save).not.toHaveBeenCalled();
       expect(recoRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('ne recrée pas un coupon déjà résolu pour le même (fixture, équipe, marché)', async () => {
+      // Régression : la déduplication ne regardait que les PENDING — un coupon
+      // passé WON sortait du filtre et la même suggestion, toujours active au
+      // tick suivant, recréait indéfiniment le même pari (Majd FC observé ×4).
+      const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
+      const snap = makeStatsSnapshot(fixture.id, 10, 12);
+      setupEvaluateFixturesMocks([[fixture], []], [[snap]]);
+
+      // La règle 1re MT émet deux suggestions (mi-temps + match entier) :
+      // les deux paris existent déjà, résolus WON.
+      couponRepo.findBy.mockResolvedValue([
+        {
+          fixtureId: fixture.id,
+          teamId: 10,
+          marketType: 'Buts 1ère mi-temps',
+          status: 'WON',
+        },
+        {
+          fixtureId: fixture.id,
+          teamId: 10,
+          marketType: 'Buts match',
+          status: 'WON',
+        },
+      ]);
+      couponRepo.find.mockResolvedValue([]);
+      recoRepo.delete.mockResolvedValue({});
+      recoRepo.save.mockResolvedValue([]);
+
+      await service.evaluateAndSave();
+
+      expect(couponRepo.findBy).toHaveBeenCalledWith({
+        fixtureId: expect.anything(),
+      });
+      expect(couponRepo.save).not.toHaveBeenCalled();
     });
 
     it('exécute resolveSettledCoupons même si la génération de suggestions échoue', async () => {
@@ -236,7 +327,9 @@ describe('SmartSuggestionsService', () => {
       await expect(service.evaluateAndSave()).rejects.toThrow('DB error');
 
       // Mais resolveSettledCoupons a été appelé dans le finally
-      expect(couponRepo.find).toHaveBeenCalledWith({ where: { status: 'PENDING' } });
+      expect(couponRepo.find).toHaveBeenCalledWith({
+        where: { status: 'PENDING' },
+      });
     });
   });
 
@@ -267,7 +360,7 @@ describe('SmartSuggestionsService', () => {
       expect(saved.resolvedAt).toBeInstanceOf(Date);
     });
 
-    it('passe coupon PENDING → LOST quand fixture terminée et équipe n\'a pas marqué (Buts match)', async () => {
+    it("passe coupon PENDING → LOST quand fixture terminée et équipe n'a pas marqué (Buts match)", async () => {
       const fixture = makeFixture({
         statusShort: 'FT',
         scoreHome: 0,
@@ -290,7 +383,7 @@ describe('SmartSuggestionsService', () => {
       expect(saved.status).toBe('LOST');
     });
 
-    it('laisse coupon PENDING si la fixture n\'est pas encore terminée', async () => {
+    it("laisse coupon PENDING si la fixture n'est pas encore terminée", async () => {
       const fixture = makeFixture({
         statusShort: '1H',
         scoreHome: 0,
@@ -311,7 +404,7 @@ describe('SmartSuggestionsService', () => {
       expect(couponRepo.save).not.toHaveBeenCalled();
     });
 
-    it('ne lève pas d\'exception quand il n\'y a aucun coupon PENDING', async () => {
+    it("ne lève pas d'exception quand il n'y a aucun coupon PENDING", async () => {
       couponRepo.find.mockResolvedValue([]);
 
       await expect(service.resolveSettledCoupons()).resolves.toBeUndefined();
@@ -388,7 +481,7 @@ describe('SmartSuggestionsService', () => {
 
     it('passe coupon → LOST pour un match annulé (CANC)', async () => {
       const fixture = makeFixture({ statusShort: 'CANC' });
-      const coupon  = makeSmartCoupon({ status: 'PENDING' });
+      const coupon = makeSmartCoupon({ status: 'PENDING' });
 
       couponRepo.find.mockResolvedValue([coupon]);
       fixtureRepo.findBy.mockResolvedValue([fixture]);
@@ -406,21 +499,21 @@ describe('SmartSuggestionsService', () => {
   describe('idempotence de saveCoupons', () => {
     it('ne crée pas de doublon si un coupon PENDING identique existe déjà', async () => {
       const fixture = makeFixture({ elapsed: 30, statusShort: '1H' });
-      const snap    = makeStatsSnapshot(fixture.id, 10, 12);
+      const snap = makeStatsSnapshot(fixture.id, 10, 12);
 
       fixtureRepo.createQueryBuilder.mockImplementation(() => {
         const qb = {
-          where:    jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
           andWhere: jest.fn().mockReturnThis(),
-          orderBy:  jest.fn().mockReturnThis(),
-          getMany:  jest.fn(),
+          orderBy: jest.fn().mockReturnThis(),
+          getMany: jest.fn(),
         };
-        qb.getMany
-          .mockResolvedValueOnce([fixture])
-          .mockResolvedValueOnce([]);
+        qb.getMany.mockResolvedValueOnce([fixture]).mockResolvedValueOnce([]);
         return qb;
       });
-      statsRepo.createQueryBuilder.mockImplementation(() => makeQbReturning([snap]));
+      statsRepo.createQueryBuilder.mockImplementation(() =>
+        makeQbReturning([snap]),
+      );
 
       // Un coupon PENDING identique existe déjà
       couponRepo.findOne.mockResolvedValue(makeSmartCoupon());
@@ -440,34 +533,42 @@ describe('SmartSuggestionsService', () => {
   describe('cas limites', () => {
     function makeQbOnce(first: unknown[], second: unknown[]) {
       const qb = {
-        where:    jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        orderBy:  jest.fn().mockReturnThis(),
-        getMany:  jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn(),
       };
       qb.getMany.mockResolvedValueOnce(first).mockResolvedValueOnce(second);
       return qb;
     }
 
-    it('ne lève pas d\'exception si une fixture n\'a aucun snapshot de stats', async () => {
+    it("ne lève pas d'exception si une fixture n'a aucun snapshot de stats", async () => {
       const fixture = makeFixture({ elapsed: 30, statusShort: '1H' });
 
-      fixtureRepo.createQueryBuilder.mockImplementation(() => makeQbOnce([fixture], []));
-      statsRepo.createQueryBuilder.mockImplementation(() => makeQbReturning([]));
+      fixtureRepo.createQueryBuilder.mockImplementation(() =>
+        makeQbOnce([fixture], []),
+      );
+      statsRepo.createQueryBuilder.mockImplementation(() =>
+        makeQbReturning([]),
+      );
       couponRepo.find.mockResolvedValue([]);
 
       await expect(service.evaluateAndSave()).resolves.toBeUndefined();
     });
 
-    it('ne lève pas d\'exception si stats est vide dans le snapshot', async () => {
+    it("ne lève pas d'exception si stats est vide dans le snapshot", async () => {
       const fixture = makeFixture({ elapsed: 30, statusShort: '1H' });
       const snapWithEmptyStats = {
         ...makeStatsSnapshot(fixture.id, 10, 0),
         stats: {},
       } as FixtureStatsSnapshot;
 
-      fixtureRepo.createQueryBuilder.mockImplementation(() => makeQbOnce([fixture], []));
-      statsRepo.createQueryBuilder.mockImplementation(() => makeQbReturning([snapWithEmptyStats]));
+      fixtureRepo.createQueryBuilder.mockImplementation(() =>
+        makeQbOnce([fixture], []),
+      );
+      statsRepo.createQueryBuilder.mockImplementation(() =>
+        makeQbReturning([snapWithEmptyStats]),
+      );
       couponRepo.find.mockResolvedValue([]);
 
       await expect(service.evaluateAndSave()).resolves.toBeUndefined();
@@ -503,12 +604,16 @@ describe('SmartSuggestionsService', () => {
   // ── Détection N+1 ─────────────────────────────────────────
 
   describe('performance — pas de N+1', () => {
-    it('ne fait qu\'un seul appel findBy pour toutes les fixtures des coupons PENDING', async () => {
+    it("ne fait qu'un seul appel findBy pour toutes les fixtures des coupons PENDING", async () => {
       const coupons = [
         makeSmartCoupon({ fixtureId: 'fixture-uuid-1' }),
         makeSmartCoupon({ id: 'coupon-2', fixtureId: 'fixture-uuid-1' }),
       ];
-      const fixture = makeFixture({ statusShort: 'FT', scoreHome: 0, scoreAway: 0 });
+      const fixture = makeFixture({
+        statusShort: 'FT',
+        scoreHome: 0,
+        scoreAway: 0,
+      });
 
       couponRepo.find.mockResolvedValue(coupons);
       fixtureRepo.findBy.mockResolvedValue([fixture]);

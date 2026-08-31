@@ -60,8 +60,14 @@ export class BetRecommendation {
   })
   edgePct: number;
 
-  @Column({ type: 'int' })
-  confidenceScore: number;
+  // Nullable depuis le LOT 2 : NULL quand aucun taux de base réel n'existe
+  // (échantillon insuffisant) — on n'invente plus de confiance.
+  @Column({ type: 'int', nullable: true })
+  confidenceScore: number | null;
+
+  // Taille de l'échantillon du taux de base ayant produit `confidenceScore`.
+  @Column({ type: 'int', nullable: true })
+  baseRateSampleSize: number | null;
 
   @Column({ type: 'json' })
   reasons: string[];

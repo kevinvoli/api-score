@@ -9,7 +9,10 @@ export class TraceIdMiddleware implements NestMiddleware {
 
   use(req: Request, res: Response, next: NextFunction): void {
     const incomingTraceId = req.header('x-trace-id');
-    const traceId = incomingTraceId && incomingTraceId.trim() ? incomingTraceId : randomUUID();
+    const traceId =
+      incomingTraceId && incomingTraceId.trim()
+        ? incomingTraceId
+        : randomUUID();
 
     (req as { traceId?: string }).traceId = traceId;
     res.setHeader('x-trace-id', traceId);

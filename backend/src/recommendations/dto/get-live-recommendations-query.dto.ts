@@ -9,6 +9,4 @@ export class GetLiveRecommendationsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(['NEW', 'ACTIVE', 'REJECTED'])
   status?: 'NEW' | 'ACTIVE' | 'REJECTED';
-
-
 }

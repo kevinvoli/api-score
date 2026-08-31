@@ -25,4 +25,3 @@ export class AppRuntimeState {
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 }
-

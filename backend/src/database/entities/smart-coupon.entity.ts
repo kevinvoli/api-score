@@ -10,7 +10,11 @@ import {
 export type SmartCouponStatus = 'PENDING' | 'WON' | 'LOST';
 
 @Entity('smart_coupons')
-@Index('idx_smart_coupons_fixture_team_market', ['fixtureId', 'teamId', 'marketType'])
+@Index('idx_smart_coupons_fixture_team_market', [
+  'fixtureId',
+  'teamId',
+  'marketType',
+])
 @Index('idx_smart_coupons_status', ['status'])
 export class SmartCoupon {
   @PrimaryGeneratedColumn('uuid')
@@ -55,6 +59,10 @@ export class SmartCoupon {
 
   @Column({ type: 'int', nullable: true })
   confidenceScore: number | null;
+
+  // Taille de l'échantillon du taux de base ayant produit `confidenceScore` (LOT 2).
+  @Column({ type: 'int', nullable: true })
+  baseRateSampleSize: number | null;
 
   @Column({ type: 'json', nullable: true })
   reasons: string[] | null;

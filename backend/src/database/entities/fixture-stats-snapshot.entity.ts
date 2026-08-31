@@ -43,4 +43,3 @@ export class FixtureStatsSnapshot {
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 }
-

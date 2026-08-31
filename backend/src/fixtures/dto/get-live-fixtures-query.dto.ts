@@ -1,12 +1,6 @@
 import { Transform } from 'class-transformer';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import {
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class GetLiveFixturesQueryDto extends PaginationQueryDto {
   @IsOptional()
@@ -34,8 +28,6 @@ export class GetLiveFixturesQueryDto extends PaginationQueryDto {
   @Transform(({ value }) => Number(value))
   @IsInt()
   teamId?: number;
-
-
 
   @IsOptional()
   @IsIn(['lastSyncedAt', 'matchDate', 'elapsed'])

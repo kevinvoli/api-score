@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateFixtureAnalytics20260220122000 implements MigrationInterface {
+export class CreateFixtureAnalytics20260220122000
+  implements MigrationInterface
+{
   name = 'CreateFixtureAnalytics20260220122000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

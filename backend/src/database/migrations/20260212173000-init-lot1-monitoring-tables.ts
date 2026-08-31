@@ -1,6 +1,8 @@
 ﻿import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class InitLot1MonitoringTables20260212173000 implements MigrationInterface {
+export class InitLot1MonitoringTables20260212173000
+  implements MigrationInterface
+{
   name = 'InitLot1MonitoringTables20260212173000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -42,4 +44,3 @@ export class InitLot1MonitoringTables20260212173000 implements MigrationInterfac
     await queryRunner.query('DROP TABLE IF EXISTS `api_usage_logs`;');
   }
 }
-
