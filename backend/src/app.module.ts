@@ -22,6 +22,11 @@ import { OddsModule } from './odds/odds.module';
 import { BacktestModule } from './backtest/backtest.module';
 import { AuditModule } from './audit/audit.module';
 import { HistoryModule } from './history/history.module';
+import { AuthModule } from './auth/auth.module';
+import { SimulationModule } from './simulation/simulation.module';
+import { ExecutionModule } from './execution/execution.module';
+import { SessionGuard } from './common/guards/session.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 
 @Module({
   imports: [
@@ -42,9 +47,17 @@ import { HistoryModule } from './history/history.module';
     BacktestModule,
     AuditModule,
     HistoryModule,
+    AuthModule,
+    SimulationModule,
+    ExecutionModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: ApiKeyGuard }],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
+    { provide: APP_GUARD, useClass: SessionGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

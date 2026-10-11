@@ -1,0 +1,16 @@
+/* Mêmes primitives visuelles que la console d'exécution. */
+.panel { composes: panel from '../execution/execution.module.css'; }
+.panelTitle { composes: panelTitle from '../execution/execution.module.css'; }
+.row { composes: row from '../execution/execution.module.css'; }
+.select { composes: select from '../execution/execution.module.css'; }
+.button { composes: button from '../execution/execution.module.css'; }
+.error { composes: error from '../execution/execution.module.css'; }
+.hint { composes: hint from '../execution/execution.module.css'; }
+.tableWrap { composes: tableWrap from '../execution/execution.module.css'; }
+.table { composes: table from '../execution/execution.module.css'; }
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

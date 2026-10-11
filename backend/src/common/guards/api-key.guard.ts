@@ -9,6 +9,10 @@ import { Reflector } from '@nestjs/core';
 import * as crypto from 'crypto';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
+interface ApiKeyRequest {
+  headers?: Record<string, string | string[] | undefined>;
+}
+
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   constructor(
@@ -23,7 +27,7 @@ export class ApiKeyGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest<Record<string, any>>();
+    const request = context.switchToHttp().getRequest<ApiKeyRequest>();
     const apiKey = request.headers?.['x-api-key'];
     const expectedKey = this.configService.get<string>('API_KEY');
 

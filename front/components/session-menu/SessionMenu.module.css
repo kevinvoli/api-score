@@ -1,0 +1,61 @@
+.menu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 16px;
+  flex-shrink: 0;
+}
+
+.email {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.role {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+}
+
+.ADMIN {
+  background: var(--color-warning-dim);
+  color: var(--color-warning);
+}
+
+.OPERATOR {
+  background: var(--color-info-dim);
+  color: var(--color-info);
+}
+
+.logout {
+  padding: 5px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.logout:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.logout:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (max-width: 900px) {
+  .email {
+    display: none;
+  }
+}

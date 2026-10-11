@@ -6,6 +6,7 @@ import { SidebarChampions } from '../components/sidebar-champions/SidebarChampio
 import { CouponPanel } from '../components/coupon-panel/CouponPanel';
 import { FixtureDetailPanel } from '../components/fixture-detail-panel/FixtureDetailPanel';
 import { DateBar } from '../components/date-bar/DateBar';
+import { SessionMenu } from '../components/session-menu/SessionMenu';
 
 export const metadata = {
   title: 'API SCORE | Command Center',
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className="app-body">
               <header className="navbar">
                 <DateBar />
+                <SessionMenu />
               </header>
               <main className="page">{children}</main>
             </div>

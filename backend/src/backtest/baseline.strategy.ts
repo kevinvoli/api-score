@@ -15,13 +15,14 @@ export function baselineStrategy(
   return {
     name: 'baseline-shots-pressure',
     version: '1.0.0',
-    entryRules,
+    // Copie : muter la stratégie ne doit jamais modifier la configuration par défaut du processus.
+    entryRules: structuredClone(entryRules),
     markets: ['Buts 1ère mi-temps', 'Buts match', 'Buts 2ème mi-temps'],
     minEdgePct: 0,
     minConfidence: 0,
     staking: { type: 'FLAT', amount: 1 },
     odds: {
-      source: ['ODDS_SNAPSHOT', 'LIVE_PAYLOAD', 'STRATEGY_DEFAULT'],
+      source: ['ODDS_SNAPSHOT'],
       executionLatencyMs: 30_000,
     },
     bankroll: 100,

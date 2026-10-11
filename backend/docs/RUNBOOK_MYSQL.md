@@ -3,8 +3,8 @@
 ## Prerequisites
 
 - MySQL 8.0+
-- Node.js 18+ with npm
-- `.env` file with valid `DB_URL`
+- Node.js 20.19+ with npm (Node.js 22 recommended, as in CI)
+- `.env` file with valid `MYSQL_*` connection variables
 
 ---
 
@@ -36,31 +36,56 @@ FLUSH PRIVILEGES;
 
 ---
 
-## 3. Configure DB_URL
+## 3. Configure the MySQL connection
 
-Set `DB_URL` in your `.env` file (copy `.env.example` if available):
+Set the following variables in your `.env` file (copy `.env.example` if available):
 
 ```
-DB_URL=mysql://api_score_app:<PASSWORD>@<HOST>:3306/api_score
+MYSQL_HOST=<HOST>
+MYSQL_PORT=3306
+MYSQL_USER=api_score_app
+MYSQL_PASSWORD=<PASSWORD>
+MYSQL_DATABASE=api_score
 ```
+
+Les contrôles d'exécution doivent rester fermés lors d'une installation ou
+d'une migration :
+
+```text
+REAL_MONEY_INTERLOCK=false
+RECONCILIATION_SCHEDULER_ENABLED=false
+RECONCILIATION_INTERVAL_MS=300000
+```
+
+`REAL_MONEY_INTERLOCK` ne suffit jamais à activer `LIVE_CANARY`. Le scheduler
+de réconciliation ne doit être activé qu'après validation QA/review du lot 7 ;
+son échec déclenche un arrêt fail-closed.
 
 **Example for local development:**
 
 ```
-DB_URL=mysql://api_score_app:mypassword@127.0.0.1:3306/api_score
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USER=api_score_app
+MYSQL_PASSWORD=mypassword
+MYSQL_DATABASE=api_score
 ```
 
 **Example for Docker Compose:**
 
 ```
-DB_URL=mysql://api_score_app:mypassword@mysql:3306/api_score
+MYSQL_HOST=mysql
+MYSQL_PORT=3306
+MYSQL_USER=api_score_app
+MYSQL_PASSWORD=mypassword
+MYSQL_DATABASE=api_score
 ```
 
 ---
 
 ## 4. Run migrations
 
-After configuring `DB_URL`, run TypeORM migrations to create all tables:
+After configuring the `MYSQL_*` variables, run TypeORM migrations to create all tables:
 
 ```bash
 npm run db:migrate
@@ -107,9 +132,9 @@ npm run build && npm run start:prod
 
 | Error message | Cause | Fix |
 |---|---|---|
-| `DB_URL is not set` | Missing `.env` or env variable | Set `DB_URL` |
+| `MYSQL_* is missing` | Missing `.env` or connection variable | Set all five `MYSQL_*` variables |
 | `ECONNREFUSED 127.0.0.1:3306` | MySQL not running | Start MySQL service |
-| `Access denied for user` | Wrong credentials | Check username / password in `DB_URL` |
+| `Access denied for user` | Wrong credentials | Check `MYSQL_USER` and `MYSQL_PASSWORD` |
 | `Unknown database 'api_score'` | DB not created | Run `CREATE DATABASE` (step 1) |
 | `Table 'api_score.xxx' doesn't exist` | Migrations not applied | Run `npm run db:migrate` |
 | `ER_NOT_SUPPORTED_AUTH_MODE` | MySQL 8 auth plugin | Use `mysql_native_password` or `caching_sha2_password` compatible driver |
@@ -121,3 +146,5 @@ npm run build && npm run start:prod
 - Never commit `.env` to version control.
 - The application user must NOT have `GRANT OPTION` or `SUPER` privileges.
 - `synchronize: false` is enforced in TypeORM configuration — schema changes go through migrations only.
+- Keep `REAL_MONEY_INTERLOCK=false` and `RECONCILIATION_SCHEDULER_ENABLED=false`
+  during migrations and initial startup.

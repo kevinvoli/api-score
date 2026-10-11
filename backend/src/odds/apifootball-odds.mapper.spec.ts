@@ -1,6 +1,7 @@
 import {
   isPartitionMarket,
   mapApifootballOddsEntry,
+  mapApifootballLiveOddsEntry,
 } from './apifootball-odds.mapper';
 import { APIFOOTBALL_ODDS_SAMPLE } from './__fixtures__/apifootball-odds.sample';
 
@@ -64,6 +65,53 @@ describe('mapApifootballOddsEntry', () => {
     expect(groups.get('AH_+0.5')).toEqual([
       { outcome: 'HOME', oddValue: 2.05 },
     ]);
+  });
+});
+
+describe('mapApifootballLiveOddsEntry', () => {
+  it('mappe une cote équipe complète avec disponibilité', () => {
+    expect(
+      mapApifootballLiveOddsEntry({
+        bookmaker: 'Bet365',
+        odd_name: 'Home Team Goals',
+        type: 'Over',
+        handicap: '0.5',
+        value: '1.82',
+        suspended: 'No',
+      }),
+    ).toEqual([
+      {
+        bookmakerName: 'Bet365',
+        marketType: 'TEAM_GOALS_FT',
+        outcome: 'HOME_OVER_0.5',
+        marketKey: 'TEAM_GOALS_FT',
+        selectionKey: 'HOME_OVER_0.5',
+        oddValue: 1.82,
+        available: true,
+      },
+    ]);
+  });
+
+  it('conserve une cote suspendue comme indisponible', () => {
+    const [mapped] = mapApifootballLiveOddsEntry({
+      bookmaker_name: 'Bet365',
+      odd_name: 'Away Team Score a Goal (1st Half)',
+      type: 'Yes',
+      value: '2.05',
+      suspended: 'Yes',
+    });
+    expect(mapped.available).toBe(false);
+  });
+
+  it('rejette un mapping fournisseur incomplet', () => {
+    expect(
+      mapApifootballLiveOddsEntry({
+        odd_name: 'Home Team Goals',
+        type: 'Over',
+        handicap: '0.5',
+        value: '1.82',
+      }),
+    ).toEqual([]);
   });
 });
 

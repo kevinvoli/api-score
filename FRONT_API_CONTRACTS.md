@@ -202,3 +202,27 @@ Use for drill-down view; fallback when chart requires raw snapshots.
 - `GET /v1/audit/recommendations` → historical rows with `result` (`won|lost|void`), `stake`, `payout`, `roi`.
 
 Create mocks that respect these shapes so Storybook/gallery can render future modules before backend exists.
+
+## 11) Console d'exploitation (lot 9, `PLAN_EXECUTION_PARIS.md`)
+
+Tous ces appels passent par le BFF (`/api/backend/...`) ; types dans `front/lib/types/execution.ts` et
+`front/lib/types/simulation.ts`. Montants en chaînes décimales, dates ISO.
+
+| Méthode | Route | Rôle | Usage front |
+|---|---|---|---|
+| `GET` | `/v1/execution/control` | VIEWER+ | État du kill switch, limites actives, santé de réconciliation (rafraîchi 10 s) |
+| `PUT` | `/v1/execution/control/stop` | ADMIN | `{ reason, expectedVersion? }` → état persisté ; idempotent |
+| `PUT` | `/v1/execution/control/mode` | ADMIN | `{ targetMode, reason, expectedVersion, gateEvidenceIds }` ; `409` si version périmée |
+| `GET` | `/v1/execution/accounts` | VIEWER+ | Comptes de bankroll (≤ 100) |
+| `GET` | `/v1/execution/orders` | VIEWER+ | `?status&cursor&limit` → `{ data, nextCursor }` |
+| `POST` | `/v1/execution/reconciliations` | OPERATOR+ | `{ accountId, from, to, idempotencyKey }` → `202 { runId }` |
+| `GET` | `/v1/execution/reconciliations/:id` | VIEWER+ | Run et écarts |
+| `GET` | `/v1/simulation/runs` | VIEWER+ | Runs récents (≤ 100, sans stratégie figée) |
+| `GET` | `/v1/simulation/runs/:id/summary` | VIEWER+ | Synthèse |
+| `GET` | `/v1/simulation/runs/:id/decisions` | VIEWER+ | `?status&cursor&limit` → `{ data, nextCursor }` |
+| `POST` | `/v1/simulation/runs/:id/stop` | ADMIN | Arrêt d'un run virtuel |
+| `GET` | `/v1/audit/walk-forward` | VIEWER+ | Runs récents (≤ 100) |
+| `GET` | `/v1/audit/walk-forward/:id` | VIEWER+ | Run et folds |
+
+Hors navigateur (refusés par l'allowlist, même pour ADMIN) : `POST /v1/execution/risk-policies`,
+`POST /v1/execution/gate-evidence`, `POST /v1/simulation/runs`, `POST /v1/audit/walk-forward`.

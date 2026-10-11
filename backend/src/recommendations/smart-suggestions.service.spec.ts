@@ -9,9 +9,9 @@ import {
   SmartRulesConfigService,
   DEFAULT_CONFIG,
 } from '../settings/smart-rules-config.service';
-import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
 import { BaseRatesService } from '../analytics/base-rates.service';
 import { JsonLogger } from '../common/json.logger';
+import { ExecutableQuoteService } from '../odds/executable-quote.service';
 
 // ── Factories ────────────────────────────────────────────────
 
@@ -117,8 +117,8 @@ describe('SmartSuggestionsService', () => {
   let recoRepo: ReturnType<typeof mockRepository>;
   let couponRepo: ReturnType<typeof mockRepository>;
   let configService: { getConfig: jest.Mock };
-  let apiClient: { fetchAllLiveOdds: jest.Mock; fetchLiveFixtures?: jest.Mock };
   let baseRatesService: { buildLookup: jest.Mock };
+  let quoteService: { loadCandidates: jest.Mock; selectLatest: jest.Mock };
   let logger: { log: jest.Mock; warn: jest.Mock; error: jest.Mock };
 
   beforeEach(async () => {
@@ -128,9 +128,25 @@ describe('SmartSuggestionsService', () => {
     couponRepo = mockRepository();
 
     configService = { getConfig: jest.fn().mockResolvedValue(DEFAULT_CONFIG) };
-    apiClient = { fetchAllLiveOdds: jest.fn().mockResolvedValue(new Map()) };
     baseRatesService = {
       buildLookup: jest.fn().mockResolvedValue(new Map()),
+    };
+    const executableQuote = {
+      snapshotId: 'quote-1',
+      providerKey: 'apifootball',
+      fixtureId: 'fixture-uuid-1',
+      providerFixtureId: '123456',
+      bookmakerKey: 'bet365',
+      marketKey: 'TEAM_GOALS_FT',
+      selectionKey: 'HOME_OVER_0.5',
+      oddValue: 1.8,
+      observedAt: new Date(),
+      receivedAt: new Date(),
+      available: true,
+    };
+    quoteService = {
+      loadCandidates: jest.fn().mockResolvedValue([executableQuote]),
+      selectLatest: jest.fn().mockReturnValue(executableQuote),
     };
     logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
@@ -145,8 +161,8 @@ describe('SmartSuggestionsService', () => {
         { provide: getRepositoryToken(BetRecommendation), useValue: recoRepo },
         { provide: getRepositoryToken(SmartCoupon), useValue: couponRepo },
         { provide: SmartRulesConfigService, useValue: configService },
-        { provide: ApiFootballClient, useValue: apiClient },
         { provide: BaseRatesService, useValue: baseRatesService },
+        { provide: ExecutableQuoteService, useValue: quoteService },
         { provide: JsonLogger, useValue: logger },
       ],
     }).compile();
@@ -222,6 +238,20 @@ describe('SmartSuggestionsService', () => {
       expect(recoRepo.save).toHaveBeenCalled();
       const savedEntities: unknown[] = recoRepo.save.mock.calls[0][0];
       expect(savedEntities.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('ne crée aucune recommandation exécutable sans cote admissible', async () => {
+      const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
+      const snap = makeStatsSnapshot(fixture.id, 10, 12);
+      setupEvaluateFixturesMocks([[fixture], []], [[snap]]);
+      quoteService.selectLatest.mockReturnValue(null);
+      couponRepo.find.mockResolvedValue([]);
+
+      await service.evaluateAndSave();
+
+      expect(recoRepo.save).not.toHaveBeenCalled();
+      expect(couponRepo.save).not.toHaveBeenCalled();
+      expect(quoteService.loadCandidates).toHaveBeenCalledTimes(1);
     });
 
     it("branche confidenceScore sur le taux de base réel (%) et sa taille d'échantillon", async () => {
@@ -334,6 +364,56 @@ describe('SmartSuggestionsService', () => {
   });
 
   // ── Tests resolveSettledCoupons() ─────────────────────────
+
+  describe('evaluateLiveSignals()', () => {
+    function mockLiveFixtures(
+      fixtures: Fixture[],
+      snaps: FixtureStatsSnapshot[],
+    ) {
+      fixtureRepo.createQueryBuilder.mockImplementation(() => {
+        const qb = {
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          getMany: jest.fn(),
+        };
+        qb.getMany.mockResolvedValueOnce(fixtures).mockResolvedValueOnce([]);
+        return qb;
+      });
+      statsRepo.createQueryBuilder.mockImplementation(() =>
+        makeQbReturning(snaps),
+      );
+    }
+
+    it('évalue la configuration fournie sans lire la configuration persistée ni de cote', async () => {
+      const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
+      mockLiveFixtures([fixture], [makeStatsSnapshot(fixture.id, 10, 12)]);
+
+      const signals = await service.evaluateLiveSignals(DEFAULT_CONFIG);
+
+      expect(configService.getConfig).not.toHaveBeenCalled();
+      expect(quoteService.loadCandidates).not.toHaveBeenCalled();
+      expect(signals.length).toBeGreaterThanOrEqual(1);
+      expect(signals[0]).toMatchObject({
+        fixtureId: fixture.id,
+        providerFixtureId: String(fixture.providerFixtureId),
+        isHomeTeam: true,
+      });
+      expect(signals[0]).not.toHaveProperty('currentOdd');
+      expect(signals[0].quoteTarget.marketKey).toMatch(/^TEAM_GOAL/);
+    });
+
+    it('applique les seuils de la configuration passée, pas ceux par défaut', async () => {
+      const fixture = makeFixture({ elapsed: 25, statusShort: '1H' });
+      mockLiveFixtures([fixture], [makeStatsSnapshot(fixture.id, 10, 12)]);
+      const stricter = {
+        ...DEFAULT_CONFIG,
+        firstHalfRules: [{ maxElapsed: 45, minShots: 20 }],
+      };
+
+      await expect(service.evaluateLiveSignals(stricter)).resolves.toEqual([]);
+    });
+  });
 
   describe('resolveSettledCoupons()', () => {
     it('passe coupon PENDING → WON quand fixture terminée et équipe a marqué (Buts match)', async () => {

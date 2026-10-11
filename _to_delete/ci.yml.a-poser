@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  backend:
+    name: Backend — lint, build, tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+  backend-mysql:
+    name: Backend — intégration MySQL (auth, contrôle, ledger, ordres, simulation, walk-forward)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      # Bases éphémères : chaque suite vérifie le nom de base et l'opt-in destructif avant de la vider.
+      AUTH_MYSQL_INTEGRATION_DB_URL: mysql://root:root@127.0.0.1:3306/api_score_auth_it
+      AUTH_MYSQL_INTEGRATION_DESTRUCTIVE: api-score-auth-it
+      EXECUTION_MYSQL_INTEGRATION_DB_URL: mysql://root:root@127.0.0.1:3306/api_score_execution_it
+      EXECUTION_MYSQL_INTEGRATION_DESTRUCTIVE: api-score-execution-it
+      WALK_FORWARD_MYSQL_INTEGRATION_DB_URL: mysql://root:root@127.0.0.1:3306/api_score_walk_forward_it
+      WALK_FORWARD_MYSQL_INTEGRATION_DESTRUCTIVE: api-score-walk-forward-it
+      SIMULATION_MYSQL_INTEGRATION_DB_URL: mysql://root:root@127.0.0.1:3306/api_score_simulation_it
+      SIMULATION_MYSQL_INTEGRATION_DESTRUCTIVE: api-score-simulation-it
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Bases éphémères
+        run: |
+          for db in api_score_auth_it api_score_execution_it api_score_walk_forward_it api_score_simulation_it; do
+            mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "CREATE DATABASE IF NOT EXISTS $db"
+          done
+
+      # Échoue si une variable manque : aucune suite d'intégration ne peut être ignorée en silence.
+      - name: Intégration MySQL
+        run: npm run test:integration -- --runInBand
+
+      - name: Simulation sur MySQL
+        run: npx jest --runInBand simulation.service
+
+  front:
+    name: Front — lint, tests, typage, build, bundle sans secret
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: front
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version de pnpm lue dans `packageManager` (front/package.json).
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: front/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: front/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint et tests
+        run: pnpm run test
+
+      - name: Typage
+        run: npx tsc --noEmit --incremental false
+
+      - name: Build avec secret sentinelle
+        env:
+          BACKEND_API_KEY: sentinel-backend-secret
+          SESSION_COOKIE_NAME: session_token
+        run: pnpm run build
+
+      - name: Aucun secret serveur dans le bundle
+        run: |
+          if grep -rl -e 'NEXT_PUBLIC_API_KEY' -e 'sentinel-backend-secret' .next; then
+            echo "Secret serveur trouvé dans le bundle Next.js" >&2
+            exit 1
+          fi

@@ -111,3 +111,23 @@ export function resolveOutcome(
 
   return null;
 }
+
+export type SettlementOutcome = 'WON' | 'LOST' | 'VOID';
+
+/**
+ * Règlement d'un pari simulé. Diffère de `resolveOutcome` (coupons historiques,
+ * inchangé) sur un seul point : un match annulé, reporté ou interrompu rembourse
+ * la mise (`VOID`) au lieu de la perdre, sauf si l'issue était déjà acquise
+ * avant l'interruption (but marqué, ou mi-temps close pour le marché 1MT).
+ */
+export function resolveSettlement(
+  bet: ResolvableBet,
+  state: FinalMatchState,
+): SettlementOutcome | null {
+  if (VOID_STATUSES.has(state.statusShort)) {
+    // Évalue l'état comme un match encore en cours : seules les issues déjà
+    // déterminées ressortent, tout le reste est remboursé.
+    return resolveOutcome(bet, { ...state, statusShort: '2H' }) ?? 'VOID';
+  }
+  return resolveOutcome(bet, state);
+}

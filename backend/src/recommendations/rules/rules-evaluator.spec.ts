@@ -9,7 +9,6 @@ function makeInput(
     statusShort: '1H',
     home: { teamId: 10, teamName: 'PSG', totalShots: null },
     away: { teamId: 20, teamName: 'Lyon', totalShots: null },
-    liveOdd: null,
     ...overrides,
   };
 }
@@ -30,8 +29,8 @@ describe('evaluateRules()', () => {
       ]);
       expect(matches[0].teamId).toBe(10);
       expect(matches[0].isHomeTeam).toBe(true);
-      expect(matches[0].currentOdd).toBe(1.75);
-      expect(matches[1].currentOdd).toBe(1.45);
+      expect(matches[0].minAcceptableOdd).toBe(1.6);
+      expect(matches[1].minAcceptableOdd).toBe(1.35);
     });
 
     it('respecte les seuils exacts : shots=9 sous le seuil 10 à elapsed=25 → rien', () => {
@@ -65,16 +64,15 @@ describe('evaluateRules()', () => {
       expect(matches[0].reasons[0]).toContain('seuil : ≥5 avant 10');
     });
 
-    it('la cote live prime sur la cote par défaut de la config', () => {
+    it('ne mélange pas le signal et le prix observable', () => {
       const input = makeInput({
         elapsed: 25,
         home: { teamId: 10, teamName: 'PSG', totalShots: 12 },
-        liveOdd: 2.1,
       });
 
       const matches = evaluateRules(input, DEFAULT_CONFIG);
-      expect(matches[0].currentOdd).toBe(2.1);
-      expect(matches[1].currentOdd).toBe(2.1);
+      expect(matches[0]).not.toHaveProperty('currentOdd');
+      expect(matches[1]).not.toHaveProperty('currentOdd');
     });
 
     it('ignore une équipe sans donnée de tirs (null ≠ 0)', () => {
@@ -120,7 +118,7 @@ describe('evaluateRules()', () => {
       expect(matches).toHaveLength(1);
       expect(matches[0].marketType).toBe('Buts 2ème mi-temps');
       expect(matches[0].shotsCount).toBe(5);
-      expect(matches[0].currentOdd).toBe(1.65);
+      expect(matches[0].minAcceptableOdd).toBe(1.5);
     });
 
     it('borne exclusive : elapsed=60 (>= maxElapsed) → rien', () => {

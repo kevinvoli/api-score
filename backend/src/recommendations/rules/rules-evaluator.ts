@@ -28,7 +28,6 @@ export interface RuleEvaluationInput {
   /** Score courant, pour la modulation par état du match (LOT 3.4). */
   scoreHome?: number | null;
   scoreAway?: number | null;
-  liveOdd: number | null;
 }
 
 /** Valeur du signal choisi pour une équipe (null = donnée absente → pas de déclenchement). */
@@ -53,7 +52,6 @@ export interface RuleMatch {
   marketType: string;
   selection: string;
   ruleName: string;
-  currentOdd: number;
   minAcceptableOdd: number;
   edgePct: number;
   confidenceScore: number;
@@ -163,7 +161,6 @@ function evaluateFirstHalf(
       shotsCount: shots,
       marketType: 'Buts 1ère mi-temps',
       selection: `${team.teamName} marque avant la mi-temps (+0.5)`,
-      currentOdd: input.liveOdd ?? oddsHT.current,
       minAcceptableOdd: oddsHT.min,
       edgePct: oddsHT.edgePct,
       confidenceScore: oddsHT.confidence,
@@ -185,7 +182,6 @@ function evaluateFirstHalf(
       shotsCount: shots,
       marketType: 'Buts match',
       selection: `${team.teamName} marque dans le match (+0.5)`,
-      currentOdd: input.liveOdd ?? oddsFT.current,
       minAcceptableOdd: oddsFT.min,
       edgePct: oddsFT.edgePct,
       confidenceScore: oddsFT.confidence,
@@ -243,7 +239,6 @@ function evaluateSecondHalf(
       shotsCount: shots,
       marketType: 'Buts 2ème mi-temps',
       selection: `${team.teamName} marque en 2ème mi-temps (+0.5)`,
-      currentOdd: input.liveOdd ?? odds.current,
       minAcceptableOdd: odds.min,
       edgePct: odds.edgePct,
       confidenceScore: odds.confidence,

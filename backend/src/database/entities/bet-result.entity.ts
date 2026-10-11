@@ -90,7 +90,7 @@ export class BetResult {
   stake: number;
 
   @Column({ type: 'varchar', length: 12 })
-  outcome: 'WON' | 'LOST' | 'NO_RESULT';
+  outcome: 'WON' | 'LOST' | 'VOID' | 'NO_RESULT';
 
   @Column({
     type: 'decimal',

@@ -56,6 +56,26 @@ const links = [
     ),
   },
   {
+    href: '/execution',
+    label: 'Exécution',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.2"/>
+        <rect x="5.25" y="5.25" width="4.5" height="4.5" rx="0.5" fill="currentColor"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/simulation',
+    label: 'Simulation',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <path d="M2 11.5l3-4 2.5 2 4.5-6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 1.6"/>
+        <path d="M1.5 13.5h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
     href: '/audit',
     label: 'Audit',
     icon: (

@@ -7,6 +7,11 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { JsonLogger } from '../json.logger';
+import { AuthenticatedPrincipal } from '../../auth/auth.types';
+
+type RequestWithOptionalPrincipal = Request & {
+  authUser?: AuthenticatedPrincipal;
+};
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -15,7 +20,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<RequestWithOptionalPrincipal>();
     const traceId = (request as { traceId?: string }).traceId ?? 'unknown';
 
     const status =
@@ -32,6 +37,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         path: request.originalUrl ?? request.url,
         statusCode: status,
         responseCode: payload.code,
+        ...(status === HttpStatus.FORBIDDEN && request.authUser
+          ? { actorUserId: request.authUser.id }
+          : {}),
       },
       exception instanceof Error ? exception.stack : undefined,
       'Exceptions',

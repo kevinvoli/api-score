@@ -18,7 +18,12 @@ import {
   SmartRulesConfig,
   SignalType,
 } from '../settings/smart-rules-config.service';
-import { ApiFootballClient } from '../provider-api-football/services/api-football.client';
+import { ExecutableQuoteService } from '../odds/executable-quote.service';
+import {
+  DEFAULT_MAX_QUOTE_AGE_MS,
+  ExecutableQuoteTarget,
+  quoteTargetForRuleMarket,
+} from '../odds/odds.types';
 import {
   evaluateRules,
   RuleEvaluationInput,
@@ -83,10 +88,12 @@ const AUTO_MARKET_TYPES = [
   'Buts 2ème mi-temps',
 ];
 
-type LiveOddsMap = Map<
-  number,
-  { ou05Over: number | null; ou05Under: number | null }
->;
+/** Signal déclenché par une règle, avant toute cote : c'est l'entrée de la simulation. */
+export type LiveSignal = Omit<SmartSuggestion, 'currentOdd'> & {
+  providerFixtureId: string;
+  quoteTarget: ExecutableQuoteTarget;
+};
+type UnpricedSuggestion = LiveSignal;
 
 @Injectable()
 export class SmartSuggestionsService {
@@ -100,8 +107,8 @@ export class SmartSuggestionsService {
     @InjectRepository(SmartCoupon)
     private readonly couponRepo: Repository<SmartCoupon>,
     private readonly configService: SmartRulesConfigService,
-    private readonly apiClient: ApiFootballClient,
     private readonly baseRatesService: BaseRatesService,
+    private readonly executableQuoteService: ExecutableQuoteService,
     private readonly logger: JsonLogger,
   ) {}
 
@@ -109,13 +116,18 @@ export class SmartSuggestionsService {
 
   /** Retourne toutes les suggestions calculées en temps réel. */
   async getAllSuggestions(): Promise<SmartSuggestion[]> {
-    const [config, liveOdds] = await Promise.all([
-      this.configService.getConfig(),
-      this.apiClient.fetchAllLiveOdds().catch(() => new Map() as LiveOddsMap),
-    ]);
+    const config = await this.configService.getConfig();
+    return this.attachExecutableQuotes(await this.evaluateLiveSignals(config));
+  }
+
+  /**
+   * Signaux live non tarifés pour la configuration fournie, sans lire la
+   * configuration persistée : la simulation y passe sa stratégie figée.
+   */
+  async evaluateLiveSignals(config: SmartRulesConfig): Promise<LiveSignal[]> {
     const [firstHalf, secondHalf] = await Promise.all([
-      this.getFirstHalfSuggestions(config, liveOdds),
-      this.getSecondHalfSuggestions(config, liveOdds),
+      this.getFirstHalfSuggestions(config),
+      this.getSecondHalfSuggestions(config),
     ]);
     return [...firstHalf, ...secondHalf];
   }
@@ -297,8 +309,7 @@ export class SmartSuggestionsService {
 
   private async getFirstHalfSuggestions(
     config: SmartRulesConfig,
-    liveOdds: LiveOddsMap,
-  ): Promise<SmartSuggestion[]> {
+  ): Promise<UnpricedSuggestion[]> {
     const maxWindow = Math.max(
       ...config.firstHalfRules.map((r) => r.maxElapsed),
     );
@@ -319,13 +330,12 @@ export class SmartSuggestionsService {
       })
       .getMany();
 
-    return this.evaluateFixturesWithRules(fixtures, config, liveOdds, 'fh');
+    return this.evaluateFixturesWithRules(fixtures, config, 'fh');
   }
 
   private async getSecondHalfSuggestions(
     config: SmartRulesConfig,
-    liveOdds: LiveOddsMap,
-  ): Promise<SmartSuggestion[]> {
+  ): Promise<UnpricedSuggestion[]> {
     const rule = config.secondHalfRule;
 
     const fixtures = await this.fixtureRepo
@@ -345,13 +355,7 @@ export class SmartSuggestionsService {
 
     const htBaseline = await this.buildHtBaseline(fixtures);
 
-    return this.evaluateFixturesWithRules(
-      fixtures,
-      config,
-      liveOdds,
-      'sh',
-      htBaseline,
-    );
+    return this.evaluateFixturesWithRules(fixtures, config, 'sh', htBaseline);
   }
 
   /**
@@ -390,10 +394,9 @@ export class SmartSuggestionsService {
   private async evaluateFixturesWithRules(
     fixtures: Fixture[],
     config: SmartRulesConfig,
-    liveOdds: LiveOddsMap,
     halfSuffix: string,
     htBaseline?: Map<string, SnapshotSignals>,
-  ): Promise<SmartSuggestion[]> {
+  ): Promise<UnpricedSuggestion[]> {
     if (!fixtures.length) return [];
 
     const signal: SignalType = config.signal ?? 'TOTAL_SHOTS';
@@ -424,7 +427,7 @@ export class SmartSuggestionsService {
       if (!tm.has(snap.teamId)) tm.set(snap.teamId, snap);
     }
 
-    const suggestions: SmartSuggestion[] = [];
+    const suggestions: UnpricedSuggestion[] = [];
 
     for (const fixture of fixtures) {
       const teamMap = latestByTeam.get(fixture.id);
@@ -435,13 +438,6 @@ export class SmartSuggestionsService {
       const awaySnap = teamMap.get(fixture.awayTeamId);
 
       const elapsed = fixture.elapsed ?? 0;
-      const provId = fixture.providerFixtureId
-        ? Number(fixture.providerFixtureId)
-        : null;
-      const liveOdd =
-        provId !== null && !Number.isNaN(provId)
-          ? (liveOdds.get(provId)?.ou05Over ?? null)
-          : null;
 
       const homeSignals = homeSnap
         ? snapshotSignals(homeSnap.stats)
@@ -482,7 +478,6 @@ export class SmartSuggestionsService {
           : undefined,
         scoreHome: fixture.scoreHome,
         scoreAway: fixture.scoreAway,
-        liveOdd,
       };
 
       const matches = evaluateRules(input, config);
@@ -501,6 +496,12 @@ export class SmartSuggestionsService {
       for (const [teamId, teamMatches] of matchesByTeam) {
         const idBase = `smart-${halfSuffix}-${fixture.id}-${teamId}`;
         teamMatches.forEach((match, index) => {
+          const quoteTarget = quoteTargetForRuleMarket(
+            String(fixture.providerFixtureId),
+            match.marketType,
+            match.isHomeTeam,
+          );
+          if (!quoteTarget) return;
           const baseRate = this.resolveBaseRate(
             fixture,
             match.marketType,
@@ -511,9 +512,10 @@ export class SmartSuggestionsService {
             id: `${idBase}-${index === 0 ? 'a' : 'b'}`,
             fixtureId: fixture.id,
             fixtureLabel: label,
+            providerFixtureId: String(fixture.providerFixtureId),
+            quoteTarget,
             marketType: match.marketType,
             selection: match.selection,
-            currentOdd: match.currentOdd,
             minAcceptableOdd: match.minAcceptableOdd,
             edgePct: match.edgePct,
             confidenceScore: baseRate.confidenceScore,
@@ -533,6 +535,40 @@ export class SmartSuggestionsService {
     }
 
     return suggestions;
+  }
+
+  private async attachExecutableQuotes(
+    suggestions: UnpricedSuggestion[],
+  ): Promise<SmartSuggestion[]> {
+    if (!suggestions.length) return [];
+
+    const now = new Date();
+    const providerFixtureIds = [
+      ...new Set(suggestions.map((suggestion) => suggestion.providerFixtureId)),
+    ];
+    const candidates = await this.executableQuoteService.loadCandidates({
+      providerFixtureIds,
+      receivedFrom: new Date(now.getTime() - DEFAULT_MAX_QUOTE_AGE_MS),
+      receivedTo: now,
+    });
+
+    const priced: SmartSuggestion[] = [];
+    for (const suggestion of suggestions) {
+      const quote = this.executableQuoteService.selectLatest(candidates, {
+        target: suggestion.quoteTarget,
+        at: now,
+        maxQuoteAgeMs: DEFAULT_MAX_QUOTE_AGE_MS,
+      });
+      if (!quote || quote.oddValue < suggestion.minAcceptableOdd) continue;
+
+      const {
+        providerFixtureId: _providerFixtureId,
+        quoteTarget: _quoteTarget,
+        ...rest
+      } = suggestion;
+      priced.push({ ...rest, currentOdd: quote.oddValue });
+    }
+    return priced;
   }
 
   /**

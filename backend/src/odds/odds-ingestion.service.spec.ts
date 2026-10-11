@@ -134,6 +134,43 @@ describe('OddsIngestionService', () => {
       expect(result).toEqual({ fixturesProcessed: 1, snapshotsInserted: 3 });
     });
 
+    it('persiste l’identité canonique, les temps et la disponibilité', async () => {
+      const fixture = makeFixture();
+      fixtureRepo._qb.getMany.mockResolvedValue([fixture]);
+      apiClient.fetchPrematchOdds.mockResolvedValue([
+        {
+          bookmakers: [
+            {
+              id: 8,
+              name: 'Bet365',
+              bets: [
+                makeBet('Both Teams Score', [
+                  { value: 'Yes', odd: '1.80' },
+                  { value: 'No', odd: '1.95' },
+                ]),
+              ],
+            },
+          ],
+        },
+      ]);
+
+      await service.syncPrematchOdds();
+
+      const rows = oddsRepo.insert.mock.calls[0][0] as Array<
+        Partial<OddsSnapshot>
+      >;
+      expect(rows[0]).toMatchObject({
+        providerKey: 'apisports',
+        providerFixtureId: '99999',
+        bookmakerKey: '8',
+        marketKey: 'BTTS',
+        selectionKey: 'YES',
+        available: true,
+      });
+      expect(rows[0].observedAt).toBeInstanceOf(Date);
+      expect(rows[0].receivedAt).toEqual(rows[0].observedAt);
+    });
+
     it('saute un marché 1X2 incomplet (une issue manquante) sans insérer ni fausser', async () => {
       const fixture = makeFixture();
       fixtureRepo._qb.getMany.mockResolvedValue([fixture]);
@@ -326,6 +363,36 @@ describe('OddsIngestionService', () => {
       expect(fixtureRepo.createQueryBuilder).toHaveBeenCalledWith('fixture');
       expect(apiClient.fetchLiveOdds).toHaveBeenCalledWith('99999');
       expect(result.fixturesProcessed).toBe(1);
+    });
+
+    it('ingère une cote équipe apifootball suspendue sans la rendre exécutable', async () => {
+      apiClient.getProvider.mockReturnValue('apifootball');
+      const fixture = makeFixture({ statusShort: '1H' });
+      fixtureRepo._qb.getMany.mockResolvedValue([fixture]);
+      apiClient.fetchLiveOdds.mockResolvedValue([
+        {
+          bookmaker: 'Bet365',
+          odd_name: 'Home Team Goals',
+          type: 'Over',
+          handicap: '0.5',
+          value: '1.82',
+          suspended: 'Yes',
+        },
+      ]);
+
+      await service.syncLiveOdds();
+
+      const rows = oddsRepo.insert.mock.calls[0][0] as Array<
+        Partial<OddsSnapshot>
+      >;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        providerKey: 'apifootball',
+        bookmakerKey: 'bet365',
+        marketKey: 'TEAM_GOALS_FT',
+        selectionKey: 'HOME_OVER_0.5',
+        available: false,
+      });
     });
   });
 

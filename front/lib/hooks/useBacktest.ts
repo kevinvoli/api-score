@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchBacktestRun,
   fetchBacktestRuns,
+  fetchWalkForwardRun,
+  fetchWalkForwardRuns,
   runBaselineBacktest,
   testBacktestConfig,
 } from '../api/audit';
@@ -46,3 +48,19 @@ export const useTestBacktestConfig = () => {
     },
   });
 };
+
+export const useWalkForwardRuns = () =>
+  useQuery({
+    queryKey: ['walk-forward-runs'],
+    queryFn: fetchWalkForwardRuns,
+    staleTime: 30_000,
+  });
+
+export const useWalkForwardRun = (id: string | null) =>
+  useQuery({
+    queryKey: ['walk-forward-run', id],
+    queryFn: () => fetchWalkForwardRun(id as string),
+    enabled: id !== null,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'RUNNING' || query.state.data?.status === 'PENDING' ? 5_000 : false,
+  });

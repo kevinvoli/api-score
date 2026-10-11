@@ -1,6 +1,8 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { IS_SESSION_PUBLIC_KEY } from '../decorators/session-public.decorator';
 import { ApiKeyGuard } from './api-key.guard';
 
 describe('ApiKeyGuard', () => {
@@ -74,5 +76,32 @@ describe('ApiKeyGuard', () => {
     } as unknown as ExecutionContext;
 
     expect(publicGuard.canActivate(context)).toBe(true);
+  });
+
+  it('should require the API key for @SessionPublic() routes', () => {
+    const sessionPublicReflector = {
+      getAllAndOverride: jest.fn(
+        (metadataKey: string) => metadataKey === IS_SESSION_PUBLIC_KEY,
+      ),
+    } as unknown as Reflector;
+    const sessionPublicGuard = new ApiKeyGuard(
+      configService,
+      sessionPublicReflector,
+    );
+    const context: ExecutionContext = {
+      getHandler: jest.fn(),
+      getClass: jest.fn(),
+      switchToHttp: () => ({
+        getRequest: () => ({ headers: {} }),
+      }),
+    } as unknown as ExecutionContext;
+
+    expect(() => sessionPublicGuard.canActivate(context)).toThrow(
+      UnauthorizedException,
+    );
+    expect(sessionPublicReflector.getAllAndOverride).toHaveBeenCalledWith(
+      IS_PUBLIC_KEY,
+      [context.getHandler(), context.getClass()],
+    );
   });
 });

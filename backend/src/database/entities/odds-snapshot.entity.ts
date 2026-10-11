@@ -23,6 +23,12 @@ const decimalTransformer = {
   'marketType',
   'capturedAt',
 ])
+// Mene par providerFixtureId : la selection filtre par egalite/IN sur la fixture puis par plage
+// de reception ; un index mene par provider_key (jamais filtre par egalite) forcait un scan complet.
+@Index('idx_odds_snapshots_executable_lookup', [
+  'providerFixtureId',
+  'receivedAt',
+])
 export class OddsSnapshot {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -37,6 +43,9 @@ export class OddsSnapshot {
   @Column({ type: 'bigint' })
   providerFixtureId: string;
 
+  @Column({ name: 'provider_key', type: 'varchar', length: 40, nullable: true })
+  providerKey: string | null;
+
   // Nullable : apifootball ne fournit qu'un nom de bookmaker, jamais d'id numérique.
   @Column({ type: 'int', nullable: true })
   bookmakerId: number | null;
@@ -44,11 +53,30 @@ export class OddsSnapshot {
   @Column({ type: 'varchar', length: 120 })
   bookmakerName: string;
 
+  @Column({
+    name: 'bookmaker_key',
+    type: 'varchar',
+    length: 160,
+    nullable: true,
+  })
+  bookmakerKey: string | null;
+
   @Column({ type: 'varchar', length: 60 })
   marketType: string;
 
+  @Column({ name: 'market_key', type: 'varchar', length: 80, nullable: true })
+  marketKey: string | null;
+
   @Column({ type: 'varchar', length: 40 })
   outcome: string;
+
+  @Column({
+    name: 'selection_key',
+    type: 'varchar',
+    length: 80,
+    nullable: true,
+  })
+  selectionKey: string | null;
 
   @Column({
     type: 'decimal',
@@ -93,6 +121,25 @@ export class OddsSnapshot {
 
   @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   capturedAt: Date;
+
+  @Column({
+    name: 'observed_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  observedAt: Date | null;
+
+  @Column({
+    name: 'received_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  receivedAt: Date | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  available: boolean | null;
 
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;

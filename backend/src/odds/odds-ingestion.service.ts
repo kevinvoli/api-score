@@ -9,6 +9,7 @@ import { ApiFootballClient } from '../provider-api-football/services/api-footbal
 import {
   isPartitionMarket,
   mapApifootballOddsEntry,
+  mapApifootballLiveOddsEntry,
 } from './apifootball-odds.mapper';
 import { impliedProbability, removeMargin } from './odds-math';
 
@@ -23,7 +24,10 @@ const LIVE_STATUSES = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE', 'BT'];
 
 interface OddsOutcome {
   outcome: string;
+  marketKey: string;
+  selectionKey: string;
   oddValue: number;
+  available: boolean;
 }
 
 @Injectable()
@@ -110,14 +114,27 @@ export class OddsIngestionService {
 
   private async ingestOddsResponse(
     fixture: Fixture,
-    response: Record<string, any>[],
+    response: Record<string, unknown>[],
     phase: Phase,
   ): Promise<number> {
-    const capturedAt = new Date();
+    const receivedAt = new Date();
+    const providerKey = this.apiFootballClient.getProvider();
     const rows =
-      this.apiFootballClient.getProvider() === 'apifootball'
-        ? this.buildApifootballRows(fixture, response, phase, capturedAt)
-        : this.buildApiSportsRows(fixture, response, phase, capturedAt);
+      providerKey === 'apifootball'
+        ? this.buildApifootballRows(
+            fixture,
+            response,
+            phase,
+            providerKey,
+            receivedAt,
+          )
+        : this.buildApiSportsRows(
+            fixture,
+            response,
+            phase,
+            providerKey,
+            receivedAt,
+          );
 
     if (!rows.length) {
       return 0;
@@ -131,15 +148,16 @@ export class OddsIngestionService {
    * un bookmakerId numérique fourni par le provider. */
   private buildApiSportsRows(
     fixture: Fixture,
-    response: Record<string, any>[],
+    response: Record<string, unknown>[],
     phase: Phase,
-    capturedAt: Date,
+    providerKey: string,
+    receivedAt: Date,
   ): Partial<OddsSnapshot>[] {
     const rows: Partial<OddsSnapshot>[] = [];
 
     for (const entry of response) {
       const bookmakers = Array.isArray(entry?.bookmakers)
-        ? entry.bookmakers
+        ? (entry.bookmakers as Record<string, unknown>[])
         : [];
 
       for (const bookmaker of bookmakers) {
@@ -150,8 +168,11 @@ export class OddsIngestionService {
           continue;
         }
 
-        const bets = Array.isArray(bookmaker?.bets) ? bookmaker.bets : [];
+        const bets = Array.isArray(bookmaker?.bets)
+          ? (bookmaker.bets as Record<string, unknown>[])
+          : [];
         const groups = this.groupBetsByMarket(fixture, bets);
+        const bookmakerKey = String(bookmakerId);
 
         for (const [marketType, outcomes] of groups) {
           rows.push(
@@ -159,10 +180,12 @@ export class OddsIngestionService {
               fixture,
               bookmakerId,
               bookmakerName,
+              bookmakerKey,
               marketType,
               outcomes,
               phase,
-              capturedAt,
+              providerKey,
+              receivedAt,
             ),
           );
         }
@@ -176,13 +199,54 @@ export class OddsIngestionService {
    * aucun id de bookmaker fourni par le provider (bookmakerId reste NULL). */
   private buildApifootballRows(
     fixture: Fixture,
-    response: Record<string, any>[],
+    response: Record<string, unknown>[],
     phase: Phase,
-    capturedAt: Date,
+    providerKey: string,
+    receivedAt: Date,
   ): Partial<OddsSnapshot>[] {
     const rows: Partial<OddsSnapshot>[] = [];
 
     for (const entry of response) {
+      const liveOutcomes = mapApifootballLiveOddsEntry(entry);
+      if (liveOutcomes.length) {
+        const liveGroups = new Map<
+          string,
+          { bookmakerName: string; marketType: string; outcomes: OddsOutcome[] }
+        >();
+        for (const outcome of liveOutcomes) {
+          const key = `${outcome.bookmakerName}|${outcome.marketType}`;
+          const group = liveGroups.get(key) ?? {
+            bookmakerName: outcome.bookmakerName,
+            marketType: outcome.marketType,
+            outcomes: [],
+          };
+          group.outcomes.push({
+            outcome: outcome.outcome,
+            marketKey: outcome.marketKey,
+            selectionKey: outcome.selectionKey,
+            oddValue: outcome.oddValue,
+            available: outcome.available,
+          });
+          liveGroups.set(key, group);
+        }
+        for (const group of liveGroups.values()) {
+          rows.push(
+            ...this.buildRowsForMarketGroup(
+              fixture,
+              null,
+              group.bookmakerName,
+              this.bookmakerKey(group.bookmakerName),
+              group.marketType,
+              group.outcomes,
+              phase,
+              providerKey,
+              receivedAt,
+            ),
+          );
+        }
+        continue;
+      }
+
       const bookmakerName =
         typeof entry?.odd_bookmakers === 'string' ? entry.odd_bookmakers : null;
       if (!bookmakerName) {
@@ -197,10 +261,17 @@ export class OddsIngestionService {
             fixture,
             null,
             bookmakerName,
+            this.bookmakerKey(bookmakerName),
             marketType,
-            outcomes,
+            outcomes.map((outcome) => ({
+              ...outcome,
+              marketKey: marketType,
+              selectionKey: outcome.outcome,
+              available: true,
+            })),
             phase,
-            capturedAt,
+            providerKey,
+            receivedAt,
           ),
         );
       }
@@ -219,25 +290,34 @@ export class OddsIngestionService {
     fixture: Fixture,
     bookmakerId: number | null,
     bookmakerName: string,
+    bookmakerKey: string,
     marketType: string,
     outcomes: OddsOutcome[],
     phase: Phase,
-    capturedAt: Date,
+    providerKey: string,
+    receivedAt: Date,
   ): Partial<OddsSnapshot>[] {
     if (!isPartitionMarket(marketType)) {
       return outcomes.map((outcome) => ({
         fixtureId: fixture.id,
         providerFixtureId: fixture.providerFixtureId,
+        providerKey,
         bookmakerId,
         bookmakerName,
+        bookmakerKey,
         marketType,
+        marketKey: outcome.marketKey,
         outcome: outcome.outcome,
+        selectionKey: outcome.selectionKey,
         oddValue: outcome.oddValue,
         impliedProbabilityRaw: impliedProbability(outcome.oddValue) ?? 0,
         impliedProbabilityFair: null,
         overround: null,
         phase,
-        capturedAt,
+        capturedAt: receivedAt,
+        observedAt: receivedAt,
+        receivedAt,
+        available: outcome.available,
       }));
     }
 
@@ -268,29 +348,38 @@ export class OddsIngestionService {
     return outcomes.map((outcome, index) => ({
       fixtureId: fixture.id,
       providerFixtureId: fixture.providerFixtureId,
+      providerKey,
       bookmakerId,
       bookmakerName,
+      bookmakerKey,
       marketType,
+      marketKey: outcome.marketKey,
       outcome: outcome.outcome,
+      selectionKey: outcome.selectionKey,
       oddValue: outcome.oddValue,
       impliedProbabilityRaw: raw[index],
       impliedProbabilityFair: fair[index],
       overround,
       phase,
-      capturedAt,
+      capturedAt: receivedAt,
+      observedAt: receivedAt,
+      receivedAt,
+      available: outcome.available,
     }));
   }
 
   /** Regroupe les values des bets par marketType normalisé. */
   private groupBetsByMarket(
     fixture: Fixture,
-    bets: Record<string, any>[],
+    bets: Record<string, unknown>[],
   ): Map<string, OddsOutcome[]> {
     const groups = new Map<string, OddsOutcome[]>();
 
     for (const bet of bets) {
       const betName = String(bet?.name ?? '');
-      const values = Array.isArray(bet?.values) ? bet.values : [];
+      const values = Array.isArray(bet?.values)
+        ? (bet.values as Record<string, unknown>[])
+        : [];
 
       for (const value of values) {
         const mapped = this.mapBetValueToMarket(
@@ -318,7 +407,13 @@ export class OddsIngestionService {
         }
 
         const bucket = groups.get(mapped.marketType) ?? [];
-        bucket.push({ outcome: mapped.outcome, oddValue });
+        bucket.push({
+          outcome: mapped.outcome,
+          marketKey: mapped.marketType,
+          selectionKey: mapped.outcome,
+          oddValue,
+          available: !this.isSuspended(value?.suspended),
+        });
         groups.set(mapped.marketType, bucket);
       }
     }
@@ -369,5 +464,21 @@ export class OddsIngestionService {
     if (marketType.startsWith('OU_')) return 2;
     if (marketType.startsWith('AH_')) return 2;
     return 0;
+  }
+
+  private bookmakerKey(bookmakerName: string): string {
+    return bookmakerName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
+  private isSuspended(value: unknown): boolean {
+    if (value === true || value === 1) return true;
+    const normalized = String(value ?? '')
+      .trim()
+      .toLowerCase();
+    return normalized === 'yes' || normalized === 'true' || normalized === '1';
   }
 }

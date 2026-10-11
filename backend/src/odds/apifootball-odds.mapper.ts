@@ -15,6 +15,15 @@ export interface ApifootballOddsOutcome {
   oddValue: number;
 }
 
+export interface ApifootballExecutableOddsOutcome
+  extends ApifootballOddsOutcome {
+  bookmakerName: string;
+  marketType: string;
+  marketKey: string;
+  selectionKey: string;
+  available: boolean;
+}
+
 const OU_LINES = [
   '0.5',
   '1',
@@ -99,9 +108,93 @@ export function mapApifootballOddsEntry(
   return groups;
 }
 
+export function mapApifootballLiveOddsEntry(
+  entry: Record<string, unknown>,
+): ApifootballExecutableOddsOutcome[] {
+  const nested = Array.isArray(entry['live_odds'])
+    ? (entry['live_odds'] as Record<string, unknown>[])
+    : [entry];
+  const parentBookmaker = bookmakerNameOf(entry);
+  const mapped: ApifootballExecutableOddsOutcome[] = [];
+
+  for (const odd of nested) {
+    const bookmakerName = bookmakerNameOf(odd) ?? parentBookmaker;
+    if (!bookmakerName) continue;
+
+    const oddValue = toNumber(odd['value'] ?? odd['odd']);
+    if (oddValue === null || impliedProbability(oddValue) === null) continue;
+
+    const identity = liveMarketIdentity(odd);
+    if (!identity) continue;
+
+    mapped.push({
+      bookmakerName,
+      marketType: identity.marketKey,
+      outcome: identity.selectionKey,
+      marketKey: identity.marketKey,
+      selectionKey: identity.selectionKey,
+      oddValue,
+      available: !isSuspended(odd['suspended']),
+    });
+  }
+
+  return mapped;
+}
+
+function bookmakerNameOf(entry: Record<string, unknown>): string | null {
+  for (const key of [
+    'odd_bookmakers',
+    'bookmaker_name',
+    'bookmaker',
+    'bookmakerName',
+  ]) {
+    const value = entry[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function isSuspended(value: unknown): boolean {
+  if (value === true || value === 1) return true;
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  return normalized === 'yes' || normalized === 'true' || normalized === '1';
+}
+
+function liveMarketIdentity(
+  odd: Record<string, unknown>,
+): { marketKey: string; selectionKey: string } | null {
+  const name = String(odd['odd_name'] ?? '').trim();
+  const type = String(odd['type'] ?? '')
+    .trim()
+    .toLowerCase();
+  const handicap = String(odd['handicap'] ?? '').trim();
+  const side = name.startsWith('Home')
+    ? 'HOME'
+    : name.startsWith('Away')
+      ? 'AWAY'
+      : null;
+  if (!side) return null;
+
+  if (name.endsWith('Team Score a Goal (1st Half)') && type === 'yes') {
+    return { marketKey: 'TEAM_GOAL_1H', selectionKey: `${side}_YES` };
+  }
+  if (name.endsWith('Team Score a Goal (2nd Half)') && type === 'yes') {
+    return { marketKey: 'TEAM_GOAL_2H', selectionKey: `${side}_YES` };
+  }
+  if (name.endsWith('Team Goals') && type === 'over' && handicap === '0.5') {
+    return {
+      marketKey: 'TEAM_GOALS_FT',
+      selectionKey: `${side}_OVER_0.5`,
+    };
+  }
+  return null;
+}
+
 /** true si le marché est une partition d'issues exclusives et exhaustives
  * (l'overround et la probabilité "fair" y ont un sens) ; false sinon
  * (ex. double chance, dont la somme des probabilités brutes vaut ~2). */
 export function isPartitionMarket(marketType: string): boolean {
-  return marketType !== 'DOUBLE_CHANCE';
+  return marketType !== 'DOUBLE_CHANCE' && !marketType.startsWith('TEAM_GOAL');
 }

@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { syncLiveFixtures, type SyncResult } from '../../lib/api/live';
+import { usePermission } from '../../lib/hooks/useCurrentUser';
 import styles from './SyncButton.module.css';
 
 type Phase = 'idle' | 'success' | 'error';
 
 export function SyncButton() {
   const queryClient = useQueryClient();
+  const canSync = usePermission();
   const [phase, setPhase] = useState<Phase>('idle');
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
   const revertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,7 +41,7 @@ export function SyncButton() {
   }, []);
 
   const handleClick = () => {
-    if (isPending || phase !== 'idle') return;
+    if (isPending || phase !== 'idle' || !canSync.allowed) return;
     mutate();
   };
 
@@ -48,8 +50,11 @@ export function SyncButton() {
       type="button"
       className={`navbar-btn primary ${styles.btn} ${styles[phase]} ${isPending ? styles.pending : ''}`}
       onClick={handleClick}
-      disabled={isPending}
-      title={lastResult ? `${lastResult.fixturesSynced} matchs · ${lastResult.eventsSynced} events · ${lastResult.statsSynced} stats` : undefined}
+      disabled={isPending || !canSync.allowed}
+      title={
+        canSync.reason ??
+        (lastResult ? `${lastResult.fixturesSynced} matchs · ${lastResult.eventsSynced} events · ${lastResult.statsSynced} stats` : undefined)
+      }
     >
       {isPending && <span className={styles.spinner} />}
 

@@ -1,0 +1,2 @@
+- [front-stack-vitest](front-stack-vitest.md) — front/ teste avec vitest+pnpm, pas Jest/npm.
+- [finding-login-200-invalid-body](finding-login-200-invalid-body.md) — login route peut renvoyer 200+{error} si backend 200 mal formé ; non corrigé, non testé.

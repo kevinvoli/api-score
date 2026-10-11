@@ -9,7 +9,7 @@
     "lint": "next lint",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "npm run lint"
+    "test": "next lint && vitest run"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
@@ -31,13 +31,19 @@
     "@types/react-dom": "^18.3.0",
     "eslint-config-next": "14.2.0",
     "storybook": "^7.1.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
   },
+  "packageManager": "pnpm@11.9.0",
   "main": "next.config.js",
   "directories": {
     "lib": "lib"
   },
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }

@@ -20,8 +20,8 @@ de value betting.
 
 ```bash
 npm install
-copy .env.example .env    # ou cp sur Linux/macOS — puis renseigner API_FOOTBALL_KEY, DB_URL, API_KEY
-npm run db:migrate        # applique les migrations sur la base MySQL pointée par DB_URL
+copy .env.example .env    # ou cp sur Linux/macOS — puis renseigner API_FOOTBALL_KEY, MYSQL_*, API_KEY
+npm run db:migrate        # applique les migrations sur la base MySQL configurée par MYSQL_*
 npm run start:dev         # démarre en watch mode sur le PORT défini (3010 par défaut)
 ```
 
@@ -62,7 +62,7 @@ explicitement marquées publiques (`@Public()`).
 Voir `.env.example` pour la liste complète et validée (`src/config/env.validation.ts`).
 À retenir particulièrement :
 
-- `DB_URL` : chaîne de connexion **MySQL** (`mysql://user:pass@host:3306/db`).
+- `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` : connexion **MySQL** partagée par l'API et la CLI TypeORM. `MYSQL_PASSWORD` est optionnel (absent ou vide = connexion sans mot de passe, pour une base locale) ; il est obligatoire en pratique pour toute base partagée ou de production.
 - `DATA_RETENTION_DAYS` (défaut 1095, ~3 saisons) : rétention des matchs et de
   leurs statistiques — matière première des taux de base et du backtest.
   `PAYLOAD_RETENTION_DAYS` (défaut 90) ne concerne que les payloads bruts,
@@ -70,6 +70,12 @@ Voir `.env.example` pour la liste complète et validée (`src/config/env.validat
 - `ODDS_SYNC_ENABLED` : désactivé par défaut. Le module Odds est fonctionnel
   mais secondaire pour un scanner (voir `AVIS_PRONOSTIQUEUR.md`).
 - `API_KEY` : clé exigée sur les routes protégées (header `x-api-key`).
+- `REAL_MONEY_INTERLOCK=false` : second verrou de sécurité. Il reste fermé par
+  défaut et ne suffit jamais à autoriser `LIVE_CANARY` ou un opérateur réel.
+- `RECONCILIATION_SCHEDULER_ENABLED=false` et
+  `RECONCILIATION_INTERVAL_MS=300000` : réconciliation périodique désactivée
+  par défaut, avec un intervalle nominal de cinq minutes lorsqu'elle est
+  explicitement activée après QA/review.
 
 ## Documentation complémentaire
 

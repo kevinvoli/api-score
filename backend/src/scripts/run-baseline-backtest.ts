@@ -23,11 +23,12 @@ async function main(): Promise<void> {
     run.windowEnd.toISOString(),
   );
   console.log(
-    '[backtest] paris: %d | WON %d / LOST %d / NO_RESULT %d',
+    '[backtest] paris: %d | WON %d / LOST %d / NO_RESULT %d / VOID %d',
     kpis.betCount,
     kpis.wonBets,
     kpis.lostBets,
     kpis.noResultBets,
+    kpis.voidBets,
   );
   console.log(
     '[backtest] hit-rate %s%% | ROI %s%% | drawdown max %s%% | bankroll finale %s',

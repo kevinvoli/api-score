@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSmartRules, useUpdateSmartRules } from '../../lib/hooks/useSmartRules';
 import { useTestBacktestConfig } from '../../lib/hooks/useBacktest';
+import { usePermission } from '../../lib/hooks/useCurrentUser';
 import {
   DEFAULT_CONFIG, SmartRulesConfig, HalfRule, OddsConfig, ShotSignal, ScoreStateModifiers,
 } from '../../lib/api/smartRules';
@@ -176,6 +177,7 @@ function ScoreStateModifiersBlock({
 // ── Panneau de résultat du backtest de test (LOT A.5) ──────────
 function TestBacktestPanel({ config }: { config: SmartRulesConfig }) {
   const { mutate: runTest, data: run, isPending, error, reset } = useTestBacktestConfig();
+  const canRun = usePermission();
 
   const kpis = run?.kpis ?? null;
 
@@ -194,7 +196,8 @@ function TestBacktestPanel({ config }: { config: SmartRulesConfig }) {
           type="button"
           className="param-add-btn"
           onClick={() => { reset(); runTest(config); }}
-          disabled={isPending}
+          disabled={isPending || !canRun.allowed}
+          title={canRun.reason ?? undefined}
         >
           {isPending ? <Loader size={14} /> : null}
           {isPending ? 'Calcul en cours…' : 'Tester cette configuration en backtest'}
@@ -257,6 +260,7 @@ function TestBacktestPanel({ config }: { config: SmartRulesConfig }) {
 export default function ParametresPage() {
   const { data: remote, isLoading, error } = useSmartRules();
   const { mutate: save, isPending: isSaving, isSuccess: saved } = useUpdateSmartRules();
+  const canSave = usePermission();
 
   const [config, setConfig] = useState<SmartRulesConfig>(DEFAULT_CONFIG);
   const [dirty, setDirty] = useState(false);
@@ -443,6 +447,9 @@ export default function ParametresPage() {
             {saved && !dirty && (
               <span className="param-saved-badge">✓ Configuration sauvegardée</span>
             )}
+            {!canSave.allowed && canSave.reason && (
+              <span className="param-readonly-note">Lecture seule — {canSave.reason.toLowerCase()}</span>
+            )}
             <button
               type="button"
               className="param-reset-btn"
@@ -455,7 +462,8 @@ export default function ParametresPage() {
               type="button"
               className="param-save-btn"
               onClick={() => save(config)}
-              disabled={!dirty || isSaving}
+              disabled={!dirty || isSaving || !canSave.allowed}
+              title={canSave.reason ?? undefined}
             >
               {isSaving ? <Loader size={14} /> : null}
               {isSaving ? 'Sauvegarde…' : 'Sauvegarder'}

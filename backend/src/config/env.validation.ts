@@ -8,6 +8,7 @@ import {
   IsString,
   IsUrl,
   Max,
+  Matches,
   Min,
   MinLength,
   validateSync,
@@ -24,7 +25,30 @@ class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
-  DB_URL: string;
+  @Matches(/\S/)
+  MYSQL_HOST: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  MYSQL_PORT: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/\S/)
+  MYSQL_USER: string;
+
+  // Optionnel : la base locale de dev tourne sans mot de passe. Vide = aucun mot de passe ;
+  // une valeur faite uniquement d'espaces est refusée (faute de frappe probable).
+  @IsOptional()
+  @IsString()
+  @Matches(/^$|\S/)
+  MYSQL_PASSWORD?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/\S/)
+  MYSQL_DATABASE: string;
 
   @IsString()
   @IsNotEmpty()
@@ -83,6 +107,24 @@ class EnvironmentVariables {
   API_KEY: string;
 
   @IsOptional()
+  @IsInt()
+  @Min(300)
+  @Max(2592000)
+  AUTH_SESSION_TTL_SECONDS?: number = 28800;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  AUTH_LOGIN_MAX_ATTEMPTS?: number = 5;
+
+  @IsOptional()
+  @IsInt()
+  @Min(60)
+  @Max(3600)
+  AUTH_LOGIN_WINDOW_SECONDS?: number = 900;
+
+  @IsOptional()
   @IsIn(['apisports', 'apifootball'])
   API_FOOTBALL_VENDOR?: string = 'apisports';
 
@@ -125,6 +167,24 @@ class EnvironmentVariables {
   @IsOptional()
   @IsIn(['true', 'false'])
   ODDS_SYNC_ENABLED?: string = 'false';
+
+  /**
+   * Second verrou argent réel (ADR 003) : fermé par défaut, requis pour LIVE_CANARY mais
+   * jamais suffisant. Une valeur hors `true`/`false` empêche le démarrage.
+   */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  REAL_MONEY_INTERLOCK?: string = 'false';
+
+  /** Réconciliation périodique des ordres (lot 7) : désactivée par défaut. */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  RECONCILIATION_SCHEDULER_ENABLED?: string = 'false';
+
+  @IsOptional()
+  @IsInt()
+  @Min(60000)
+  RECONCILIATION_INTERVAL_MS?: number = 300000;
 
   @IsOptional()
   @IsInt()

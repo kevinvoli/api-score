@@ -2,6 +2,7 @@ import {
   FinalMatchState,
   ResolvableBet,
   resolveOutcome,
+  resolveSettlement,
 } from './outcome-resolver';
 
 function bet(marketType: string, isHomeTeam = true): ResolvableBet {
@@ -115,5 +116,41 @@ describe('resolveOutcome()', () => {
       const s = state({ statusShort: 'NS', scoreHome: null, scoreAway: null });
       expect(resolveOutcome(bet('Buts match'), s)).toBeNull();
     });
+  });
+});
+
+describe('resolveSettlement()', () => {
+  it.each(['CANC', 'PST', 'ABD', 'SUSP', 'INT', 'WO'])(
+    'rembourse (VOID) un match %s sans issue acquise, là où resolveOutcome perd',
+    (statusShort) => {
+      const s = state({ statusShort, scoreHome: 0, htScoreHome: null });
+      expect(resolveSettlement(bet('Buts match'), s)).toBe('VOID');
+      expect(resolveOutcome(bet('Buts match'), s)).toBe('LOST');
+    },
+  );
+
+  it('conserve un gain acquis avant l’interruption', () => {
+    const s = state({ statusShort: 'ABD', scoreHome: 1, htScoreHome: 1 });
+    expect(resolveSettlement(bet('Buts match'), s)).toBe('WON');
+    expect(resolveSettlement(bet('Buts 1ère mi-temps'), s)).toBe('WON');
+  });
+
+  it('1MT déjà close sans but avant l’interruption : perdu, pas remboursé', () => {
+    const s = state({ statusShort: 'ABD', scoreHome: 0, htScoreHome: 0 });
+    expect(resolveSettlement(bet('Buts 1ère mi-temps'), s)).toBe('LOST');
+    expect(resolveSettlement(bet('Buts match'), s)).toBe('VOID');
+  });
+
+  it('2MT interrompue sans but en 2MT : remboursé', () => {
+    const s = state({ statusShort: 'ABD', scoreHome: 1, htScoreHome: 1 });
+    expect(resolveSettlement(bet('Buts 2ème mi-temps'), s)).toBe('VOID');
+  });
+
+  it('se comporte comme resolveOutcome hors annulation', () => {
+    const finished = state({ statusShort: 'FT', scoreHome: 0, htScoreHome: 0 });
+    const live = state({ statusShort: '1H', scoreHome: 0, htScoreHome: null });
+
+    expect(resolveSettlement(bet('Buts match'), finished)).toBe('LOST');
+    expect(resolveSettlement(bet('Buts match'), live)).toBeNull();
   });
 });

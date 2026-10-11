@@ -4,6 +4,7 @@ import {
   Controller,
   DefaultValuePipe,
   Get,
+  HttpCode,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -16,6 +17,12 @@ import { Repository } from 'typeorm';
 import { BacktestEngineService } from '../backtest/backtest-engine.service';
 import { BacktestStrategy } from '../backtest/backtest.types';
 import { baselineStrategy } from '../backtest/baseline.strategy';
+import { WalkForwardService } from '../backtest/walk-forward.service';
+import { AuthenticatedPrincipal, UserRole } from '../auth/auth.types';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { WalkForwardFold } from '../database/entities/walk-forward-fold.entity';
+import { WalkForwardRun } from '../database/entities/walk-forward-run.entity';
 import { BacktestRun } from '../database/entities/backtest-run.entity';
 import { BetResult } from '../database/entities/bet-result.entity';
 import {
@@ -23,11 +30,17 @@ import {
   SmartRulesConfigService,
 } from '../settings/smart-rules-config.service';
 import { RunBacktestDto } from './dto/run-backtest.dto';
+import { RunWalkForwardDto } from './dto/run-walk-forward.dto';
+import { isWalkForwardStrategy } from '../backtest/strategy.guard';
 
-@Controller('audit/backtest')
+const DAY_MS = 86_400_000;
+const MAX_WALK_FORWARD_RANGE_DAYS = 1_096;
+
+@Controller('audit')
 export class AuditController {
   constructor(
     private readonly engine: BacktestEngineService,
+    private readonly walkForward: WalkForwardService,
     private readonly rulesConfig: SmartRulesConfigService,
     @InjectRepository(BacktestRun)
     private readonly runRepo: Repository<BacktestRun>,
@@ -35,7 +48,7 @@ export class AuditController {
     private readonly betRepo: Repository<BetResult>,
   ) {}
 
-  @Post()
+  @Post('backtest')
   async runBacktest(@Body() dto: RunBacktestDto): Promise<BacktestRun> {
     const strategy = await this.resolveStrategy(dto);
 
@@ -74,12 +87,12 @@ export class AuditController {
     return baselineStrategy(entryRules);
   }
 
-  @Get()
+  @Get('backtest')
   async listRuns(): Promise<BacktestRun[]> {
     return this.runRepo.find({ order: { createdAt: 'DESC' }, take: 50 });
   }
 
-  @Get(':id')
+  @Get('backtest/:id')
   async getRun(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
@@ -96,5 +109,59 @@ export class AuditController {
     });
 
     return Object.assign(run, { bets, betTotal });
+  }
+
+  /** Contrat PLAN 3.3 : lance un walk-forward figé et rend la main immédiatement. */
+  @Post('walk-forward')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(202)
+  async runWalkForward(
+    @Body() dto: RunWalkForwardDto,
+    @CurrentUser() user: AuthenticatedPrincipal,
+  ): Promise<{ runId: string }> {
+    if (!isWalkForwardStrategy(dto.strategy)) {
+      throw new BadRequestException(
+        'Stratégie invalide : name, markets, minEdgePct, minConfidence, bankroll, staking, odds et entryRules complets sont requis',
+      );
+    }
+    const rangeMs = dto.to.getTime() - dto.from.getTime();
+    if (rangeMs <= 0 || rangeMs > MAX_WALK_FORWARD_RANGE_DAYS * DAY_MS) {
+      throw new BadRequestException(
+        `La plage from/to doit être positive et ne pas dépasser ${MAX_WALK_FORWARD_RANGE_DAYS} jours`,
+      );
+    }
+
+    return this.walkForward.start(
+      {
+        strategyVersion: dto.strategyVersion,
+        strategy: dto.strategy,
+        trainWindowDays: dto.trainWindowDays,
+        validationWindowDays: dto.validationWindowDays,
+        testWindowDays: dto.testWindowDays,
+        stepDays: dto.stepDays,
+        from: dto.from,
+        to: dto.to,
+        bookmakerKey: dto.bookmakerKey,
+        maxQuoteAgeMs: dto.maxQuoteAgeMs,
+        executionLatencyMs: dto.executionLatencyMs,
+      },
+      user.id,
+    );
+  }
+
+  @Get('walk-forward')
+  @Roles(UserRole.VIEWER)
+  listWalkForward(): Promise<WalkForwardRun[]> {
+    return this.walkForward.listRuns();
+  }
+
+  @Get('walk-forward/:id')
+  @Roles(UserRole.VIEWER)
+  async getWalkForward(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<WalkForwardRun & { folds: WalkForwardFold[] }> {
+    const run = await this.walkForward.getRun(id);
+    if (!run) throw new NotFoundException(`Walk-forward ${id} introuvable`);
+    return run;
   }
 }

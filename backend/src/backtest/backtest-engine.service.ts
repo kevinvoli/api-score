@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -8,27 +9,66 @@ import {
   getStatValue,
   computePressureIndex,
 } from '../common/utils/stats.utils';
-import { ApiFootballPayload } from '../database/entities/api-football-payload.entity';
 import { BacktestRun } from '../database/entities/backtest-run.entity';
 import { BetResult } from '../database/entities/bet-result.entity';
 import { Fixture } from '../database/entities/fixture.entity';
 import { FixtureEvent } from '../database/entities/fixture-event.entity';
 import { FixtureStatsSnapshot } from '../database/entities/fixture-stats-snapshot.entity';
 import {
-  resolveOutcome,
+  resolveSettlement,
   FinalMatchState,
 } from '../recommendations/rules/outcome-resolver';
 import {
   evaluateRules,
   RuleEvaluationInput,
 } from '../recommendations/rules/rules-evaluator';
+import { ExecutableQuoteService } from '../odds/executable-quote.service';
+import {
+  DEFAULT_MAX_QUOTE_AGE_MS,
+  quoteTargetForRuleMarket,
+} from '../odds/odds.types';
 import { applyStakingAndComputeKpis } from './kpis-calculator';
-import { BacktestStrategy, DecidedBet, OddsSource } from './backtest.types';
+import {
+  BacktestStrategy,
+  DecidedBet,
+  ReplayResult,
+  SignalRecord,
+  SignalStage,
+} from './backtest.types';
 
-interface OddsPayloadTick {
-  at: Date;
-  /** entrées live_odds du payload pour un match donné */
-  entries: Record<string, unknown>[];
+const STAGE_RANK: Record<SignalStage, number> = {
+  NO_QUOTE_AT_DECISION: 0,
+  BELOW_MIN_ODD_AT_DECISION: 1,
+  NO_QUOTE_AT_EXECUTION: 2,
+  BELOW_MIN_ODD_AT_EXECUTION: 3,
+  PLACED: 4,
+};
+
+/**
+ * JSON canonique : clés triées récursivement, dates en ISO. Deux entrées égales
+ * produisent la même chaîne, donc le même hash, quel que soit l'ordre d'insertion.
+ */
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(canonicalize(value));
+}
+
+function canonicalize(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.keys(record)
+      .sort()
+      .reduce<Record<string, unknown>>((acc, key) => {
+        if (record[key] !== undefined) acc[key] = canonicalize(record[key]);
+        return acc;
+      }, {});
+  }
+  return value;
+}
+
+export function sha256Canonical(value: unknown): string {
+  return createHash('sha256').update(canonicalJson(value)).digest('hex');
 }
 
 @Injectable()
@@ -44,8 +84,7 @@ export class BacktestEngineService {
     private readonly statsRepo: Repository<FixtureStatsSnapshot>,
     @InjectRepository(FixtureEvent)
     private readonly eventRepo: Repository<FixtureEvent>,
-    @InjectRepository(ApiFootballPayload)
-    private readonly payloadRepo: Repository<ApiFootballPayload>,
+    private readonly executableQuoteService: ExecutableQuoteService,
     private readonly logger: JsonLogger,
   ) {}
 
@@ -66,12 +105,16 @@ export class BacktestEngineService {
     );
 
     try {
-      const decided = await this.replay(strategy, resolvedWindow);
+      const { bets: decided } = await this.replayDetailed(
+        strategy,
+        resolvedWindow,
+      );
       const { staked, kpis } = applyStakingAndComputeKpis(decided, strategy);
 
-      if (staked.length) {
+      const placed = staked.filter((b) => b.placed);
+      if (placed.length) {
         await this.betRepo.insert(
-          staked.map((b) => ({
+          placed.map((b) => ({
             runId: run.id,
             fixtureId: b.fixtureId,
             providerFixtureId: b.providerFixtureId,
@@ -152,20 +195,51 @@ export class BacktestEngineService {
     strategy: BacktestStrategy,
     window: { start: Date; end: Date },
   ): Promise<DecidedBet[]> {
+    return (await this.replayDetailed(strategy, window)).bets;
+  }
+
+  /**
+   * Rejeu complet : paris décidés, sort de chaque signal (absences de cote
+   * comprises) et empreinte des données lues. Toutes les lectures sont groupées
+   * (une requête par table, jamais par fixture).
+   */
+  async replayDetailed(
+    strategy: BacktestStrategy,
+    window: { start: Date; end: Date },
+  ): Promise<ReplayResult> {
     const snapshots = await this.statsRepo
       .createQueryBuilder('s')
       .where('s.snapshotAt BETWEEN :start AND :end', window)
       .orderBy('s.snapshotAt', 'ASC')
       .getMany();
-    if (!snapshots.length) return [];
+    // Départage stable des snapshots simultanés : l'ordre de rejeu (donc le hash) ne
+    // dépend pas de l'ordre de retour du SGBD.
+    snapshots.sort(
+      (a, b) =>
+        a.snapshotAt.getTime() - b.snapshotAt.getTime() ||
+        a.id.localeCompare(b.id),
+    );
+    if (!snapshots.length) {
+      return { bets: [], signals: [], datasetHash: sha256Canonical([]) };
+    }
 
     const fixtureIds = [...new Set(snapshots.map((s) => s.fixtureId))];
     const fixtures = await this.fixtureRepo.findBy({ id: In(fixtureIds) });
     const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
 
-    const oddsByMatch = await this.loadOddsPayloads(window);
     const config = strategy.entryRules;
     const latencyMs = strategy.odds.executionLatencyMs;
+    const maxQuoteAgeMs =
+      strategy.odds.maxQuoteAgeMs ?? DEFAULT_MAX_QUOTE_AGE_MS;
+    const bookmakerKey = strategy.odds.bookmakerKey;
+    const providerFixtureIds = fixtures.map((fixture) =>
+      String(fixture.providerFixtureId),
+    );
+    const quoteCandidates = await this.executableQuoteService.loadCandidates({
+      providerFixtureIds,
+      receivedFrom: new Date(window.start.getTime() - maxQuoteAgeMs),
+      receivedTo: new Date(window.end.getTime() + latencyMs),
+    });
 
     const snapshotsByFixture = new Map<string, FixtureStatsSnapshot[]>();
     for (const snap of snapshots) {
@@ -187,6 +261,26 @@ export class BacktestEngineService {
     }
 
     const bets: DecidedBet[] = [];
+    const signalByKey = new Map<string, SignalRecord>();
+    const recordSignal = (
+      key: string,
+      fixtureId: string,
+      marketType: string,
+      at: Date,
+      stage: SignalStage,
+    ) => {
+      const existing = signalByKey.get(key);
+      if (!existing) {
+        signalByKey.set(key, {
+          fixtureId,
+          marketType,
+          firstSignalAt: at,
+          stage,
+        });
+      } else if (STAGE_RANK[stage] > STAGE_RANK[existing.stage]) {
+        existing.stage = stage;
+      }
+    };
 
     for (const [fixtureId, fixtureSnaps] of snapshotsByFixture) {
       const fixture = fixtureById.get(fixtureId);
@@ -194,8 +288,6 @@ export class BacktestEngineService {
       if (fixture.homeTeamId === null || fixture.awayTeamId === null) continue;
 
       const finalState = this.buildFinalState(fixture);
-      const matchOdds =
-        oddsByMatch.get(String(fixture.providerFixtureId)) ?? [];
       const placedKeys = new Set<string>();
       const fixtureGoals = goalsByFixture.get(fixtureId) ?? [];
 
@@ -258,7 +350,6 @@ export class BacktestEngineService {
           },
           scoreHome: score.home,
           scoreAway: score.away,
-          liveOdd: null,
         };
 
         for (const match of evaluateRules(input, config)) {
@@ -268,17 +359,61 @@ export class BacktestEngineService {
 
           const key = `${fixtureId}|${match.teamId}|${match.marketType}`;
           if (placedKeys.has(key)) continue;
-          placedKeys.add(key);
 
-          const sourced = this.resolveOddAtDecision(
-            strategy,
-            matchOdds,
-            new Date(tickAt!.getTime() + latencyMs),
+          const baseTarget = quoteTargetForRuleMarket(
+            String(fixture.providerFixtureId),
             match.marketType,
             match.isHomeTeam,
           );
+          if (!baseTarget) continue;
+          const target = bookmakerKey
+            ? { ...baseTarget, bookmakerKey }
+            : baseTarget;
+          const signal = (stage: SignalStage) =>
+            recordSignal(key, fixtureId, match.marketType, tickAt!, stage);
 
-          const outcome = resolveOutcome(
+          const decisionQuote = this.executableQuoteService.selectLatest(
+            quoteCandidates,
+            {
+              target,
+              at: tickAt!,
+              maxQuoteAgeMs,
+            },
+          );
+          if (!decisionQuote) {
+            signal('NO_QUOTE_AT_DECISION');
+            continue;
+          }
+          if (decisionQuote.oddValue < match.minAcceptableOdd) {
+            signal('BELOW_MIN_ODD_AT_DECISION');
+            continue;
+          }
+
+          const executionQuote = this.executableQuoteService.selectLatest(
+            quoteCandidates,
+            {
+              target: {
+                ...target,
+                providerKey: decisionQuote.providerKey,
+                bookmakerKey: decisionQuote.bookmakerKey,
+              },
+              at: new Date(tickAt!.getTime() + latencyMs),
+              maxQuoteAgeMs,
+            },
+          );
+          if (!executionQuote) {
+            signal('NO_QUOTE_AT_EXECUTION');
+            continue;
+          }
+          if (executionQuote.oddValue < match.minAcceptableOdd) {
+            signal('BELOW_MIN_ODD_AT_EXECUTION');
+            continue;
+          }
+          placedKeys.add(key);
+          signal('PLACED');
+
+          // Même règle de règlement que la simulation : un match annulé rembourse (VOID).
+          const outcome = resolveSettlement(
             { marketType: match.marketType, isHomeTeam: match.isHomeTeam },
             finalState,
           );
@@ -293,8 +428,9 @@ export class BacktestEngineService {
             isHomeTeam: match.isHomeTeam,
             decisionAt: tickAt!,
             elapsedAtDecision: tickElapsed,
-            oddAtDecision: sourced?.odd ?? match.currentOdd,
-            oddSource: sourced?.source ?? 'STRATEGY_DEFAULT',
+            oddAtDecision: executionQuote.oddValue,
+            quotedOdd: decisionQuote.oddValue,
+            oddSource: 'ODDS_SNAPSHOT',
             edgePct: match.edgePct,
             confidenceScore: match.confidenceScore,
             outcome: outcome ?? 'NO_RESULT',
@@ -331,7 +467,48 @@ export class BacktestEngineService {
       evaluateTick();
     }
 
-    return bets;
+    const datasetHash = sha256Canonical({
+      snapshots: snapshots.map((snap) => [
+        snap.id,
+        snap.fixtureId,
+        snap.teamId,
+        snap.elapsed,
+        snap.snapshotAt,
+        snap.stats,
+      ]),
+      fixtures: [...fixtures]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((fixture) => [
+          fixture.id,
+          String(fixture.providerFixtureId),
+          fixture.homeTeamId,
+          fixture.awayTeamId,
+          this.buildFinalState(fixture),
+        ]),
+      goals: goals
+        .map((goal) => [goal.fixtureId, goal.teamId, goal.minute])
+        .sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b))),
+      quotes: [...quoteCandidates]
+        .sort((a, b) => a.snapshotId.localeCompare(b.snapshotId))
+        .map((quote) => [
+          quote.snapshotId,
+          quote.providerKey,
+          quote.bookmakerKey,
+          quote.marketKey,
+          quote.selectionKey,
+          quote.oddValue,
+          quote.observedAt,
+          quote.receivedAt,
+        ]),
+    });
+
+    const signals = [...signalByKey.values()].sort(
+      (a, b) =>
+        a.firstSignalAt.getTime() - b.firstSignalAt.getTime() ||
+        a.fixtureId.localeCompare(b.fixtureId) ||
+        a.marketType.localeCompare(b.marketType),
+    );
+    return { bets, signals, datasetHash };
   }
 
   private buildFinalState(fixture: Fixture): FinalMatchState {
@@ -344,101 +521,4 @@ export class BacktestEngineService {
       htScoreAway: extractHtScore(raw, false),
     };
   }
-
-  /** Payloads live_odds_all de la fenêtre, indexés par match_id provider. */
-  private async loadOddsPayloads(window: {
-    start: Date;
-    end: Date;
-  }): Promise<Map<string, OddsPayloadTick[]>> {
-    const payloads = await this.payloadRepo
-      .createQueryBuilder('p')
-      .where('p.endpoint = :ep', { ep: 'live_odds_all' })
-      .andWhere('p.createdAt BETWEEN :start AND :end', window)
-      .orderBy('p.createdAt', 'ASC')
-      .getMany();
-
-    const byMatch = new Map<string, OddsPayloadTick[]>();
-    for (const p of payloads) {
-      const arr = Array.isArray(p.payload)
-        ? p.payload
-        : Object.values(p.payload ?? {});
-      for (const entry of arr as Record<string, unknown>[]) {
-        const matchId = String(entry?.['match_id'] ?? '');
-        if (!matchId) continue;
-        const lo = entry['live_odds'];
-        const entries = Array.isArray(lo)
-          ? (lo as Record<string, unknown>[])
-          : [];
-        if (!entries.length) continue;
-        const list = byMatch.get(matchId) ?? [];
-        list.push({ at: p.createdAt, entries });
-        byMatch.set(matchId, list);
-      }
-    }
-    return byMatch;
-  }
-
-  /**
-   * Cote disponible au plus tard à `deadline` (T + latence), selon la chaîne
-   * de sources de la stratégie. ODDS_SNAPSHOT ne couvre pas encore les
-   * marchés « équipe marque » (1X2/OU/BTTS seulement) → passe au suivant.
-   */
-  private resolveOddAtDecision(
-    strategy: BacktestStrategy,
-    matchOdds: OddsPayloadTick[],
-    deadline: Date,
-    marketType: string,
-    isHomeTeam: boolean,
-  ): { odd: number; source: OddsSource } | null {
-    for (const source of strategy.odds.source) {
-      if (source === 'LIVE_PAYLOAD') {
-        const tick = [...matchOdds]
-          .reverse()
-          .find((t) => t.at.getTime() <= deadline.getTime());
-        if (!tick) continue;
-        const odd = extractTeamScoresOdd(tick.entries, marketType, isHomeTeam);
-        if (odd !== null) return { odd, source };
-      }
-      if (source === 'STRATEGY_DEFAULT') {
-        return null; // le défaut de la config est déjà porté par RuleMatch.currentOdd
-      }
-    }
-    return null;
-  }
-}
-
-/**
- * Extrait la cote « l'équipe marque » depuis les entrées live_odds apifootball
- * ({ odd_name, type, value, handicap, suspended }) pour le marché demandé.
- */
-export function extractTeamScoresOdd(
-  entries: Record<string, unknown>[],
-  marketType: string,
-  isHomeTeam: boolean,
-): number | null {
-  const side = isHomeTeam ? 'Home' : 'Away';
-  const wanted =
-    marketType === 'Buts 1ère mi-temps'
-      ? `${side} Team Score a Goal (1st Half)`
-      : marketType === 'Buts 2ème mi-temps'
-        ? `${side} Team Score a Goal (2nd Half)`
-        : marketType === 'Buts match'
-          ? `${side} Team Goals`
-          : null;
-  if (!wanted) return null;
-
-  for (const e of entries) {
-    if (String(e['suspended'] ?? '') === 'Yes') continue;
-    if (String(e['odd_name'] ?? '') !== wanted) continue;
-    const type = String(e['type'] ?? '');
-    if (marketType === 'Buts match') {
-      // "Home Team Goals" : Over 0.5 = l'équipe marque au moins un but
-      if (type !== 'Over' || String(e['handicap'] ?? '') !== '0.5') continue;
-    } else if (type !== 'Yes') {
-      continue;
-    }
-    const value = Number(e['value']);
-    if (Number.isFinite(value) && value > 1) return value;
-  }
-  return null;
 }

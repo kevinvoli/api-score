@@ -19,6 +19,23 @@ import { OddsSnapshot } from './odds-snapshot.entity';
 import { SmartCoupon } from './smart-coupon.entity';
 import { Standing } from './standing.entity';
 import { Team } from './team.entity';
+import { AuthUser } from './auth-user.entity';
+import { AuthSession } from './auth-session.entity';
+import { OperationAuditEvent } from './operation-audit-event.entity';
+import { AuthLoginAttempt } from './auth-login-attempt.entity';
+import { WalkForwardRun } from './walk-forward-run.entity';
+import { WalkForwardFold } from './walk-forward-fold.entity';
+import { SimulationRun } from './simulation-run.entity';
+import { BetDecision } from './bet-decision.entity';
+import { ExecutionControl } from './execution-control.entity';
+import { RiskPolicy } from './risk-policy.entity';
+import { ExecutionGateEvidence } from './execution-gate-evidence.entity';
+import { BankrollAccount } from './bankroll-account.entity';
+import { BankrollLedgerEntry } from './bankroll-ledger-entry.entity';
+import { BetOrder } from './bet-order.entity';
+import { BetReceipt } from './bet-receipt.entity';
+import { ReconciliationRun } from './reconciliation-run.entity';
+import { ReconciliationItem } from './reconciliation-item.entity';
 
 export const ALL_ENTITIES = [
   ApiFootballPayload,
@@ -42,4 +59,21 @@ export const ALL_ENTITIES = [
   SmartCoupon,
   Standing,
   Team,
+  AuthUser,
+  AuthSession,
+  OperationAuditEvent,
+  AuthLoginAttempt,
+  WalkForwardRun,
+  WalkForwardFold,
+  SimulationRun,
+  BetDecision,
+  ExecutionControl,
+  RiskPolicy,
+  ExecutionGateEvidence,
+  BankrollAccount,
+  BankrollLedgerEntry,
+  BetOrder,
+  BetReceipt,
+  ReconciliationRun,
+  ReconciliationItem,
 ];

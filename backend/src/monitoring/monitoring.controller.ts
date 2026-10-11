@@ -12,13 +12,11 @@ export class MonitoringController {
     return this.monitoringService.getHealth();
   }
 
-  @Public()
   @Get('metrics/usage')
   getUsageMetrics() {
     return this.monitoringService.getUsageMetrics();
   }
 
-  @Public()
   @Get('metrics/pipeline')
   getPipelineMetrics() {
     return this.monitoringService.getPipelineMetrics();
